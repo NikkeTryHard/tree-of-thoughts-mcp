@@ -3,7 +3,6 @@ import { InvestigationState } from "../state/investigation";
 
 export const startInputSchema = z.object({
   query: z.string().describe("The investigation query/problem to solve"),
-  minRoots: z.number().min(1).default(5).describe("Minimum number of root nodes in Round 1 (default: 5)"),
 });
 
 export type StartInput = z.infer<typeof startInputSchema>;
@@ -11,34 +10,33 @@ export type StartInput = z.infer<typeof startInputSchema>;
 export interface StartResult {
   sessionId: string;
   query: string;
-  minRoots: number;
   currentRound: number;
   instructions: string;
 }
 
 export async function handleStart(input: StartInput, persistDir: string = "./investigations"): Promise<StartResult> {
   const query = input.query;
-  const minRoots = input.minRoots ?? 5;
 
-  const state = InvestigationState.create(query, minRoots, persistDir);
+  const state = InvestigationState.create(query, 1, persistDir); // Always 1 root
   state.save();
 
   return {
     sessionId: state.data.sessionId,
     query: state.data.query,
-    minRoots: state.data.minRoots,
     currentRound: state.data.currentRound,
-    instructions: `Investigation started. You must now:
-1. Call tot_propose with ${minRoots} root nodes (R1.A, R1.B, R1.C, ...)
-2. Each root node needs: id, parent (null for roots), title, plannedAction
-3. After propose succeeds, spawn Task agents for EACH node
-4. Call tot_commit with results AND agentId when agents complete
+    instructions: `Investigation started. Single root paradigm:
+
+1. Call tot_propose with ONE root node: R1.A (the query itself)
+2. Spawn agent for R1.A, commit as EXPLORE
+3. R1.A must branch into 3-5 children at R2
+4. Continue branching until R4+ where you can use FOUND
+5. Each FOUND needs a VERIFY child
 
 Rules:
-- Maximum 5 nodes per batch
-- EXPLORE nodes require >= 2 children
-- FOUND requires 1+ VERIFY children (only at R3+)
-- DEAD/VERIFY are terminal (no children)
-- Minimum 3 rounds before ending`,
+- Single root R1.A, then branch wide at R2
+- EXPLORE nodes need 2+ children
+- FOUND only at R4+ (auto-converts before)
+- FOUND needs 1+ VERIFY children
+- Minimum 5 rounds before ending`,
   };
 }
