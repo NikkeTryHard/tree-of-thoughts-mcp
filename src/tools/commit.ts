@@ -82,7 +82,7 @@ export async function handleCommit(input: CommitInput, persistDir: string = "./i
     };
   }
 
-  // Anti-gaming: Check timing - warn if committed too fast
+  // Anti-gaming checks: timing and agentId
   for (const result of input.results) {
     const proposal = state.getPendingProposal(result.nodeId);
     if (proposal) {
@@ -91,10 +91,6 @@ export async function handleCommit(input: CommitInput, persistDir: string = "./i
         warnings.push(`SUSPICIOUS: ${result.nodeId} committed ${Math.round(elapsed / 1000)}s after propose (min ${MIN_RESEARCH_TIME_MS / 1000}s). Was an agent actually spawned?`);
       }
     }
-  }
-
-  // Anti-gaming: Check for missing agentId
-  for (const result of input.results) {
     if (!result.agentId) {
       warnings.push(`MISSING_AGENT: ${result.nodeId} has no agentId. Cannot verify research was performed.`);
     }
