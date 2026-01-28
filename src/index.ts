@@ -14,13 +14,12 @@ const server = new McpServer({
 // tot_start - Begin investigation
 server.tool(
   "tot_start",
-  "Start investigation. Returns sessionId.",
+  "Start investigation with single root. Returns sessionId.",
   {
     query: z.string().describe("The problem to investigate"),
-    minRoots: z.number().min(1).optional().describe("Min root nodes (default: 3)"),
   },
   async (input) => {
-    const result = await handleStart({ query: input.query, minRoots: input.minRoots ?? 3 }, PERSIST_DIR);
+    const result = await handleStart({ query: input.query }, PERSIST_DIR);
     return {
       content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
     };
@@ -55,14 +54,14 @@ server.tool(
 // tot_commit - Submit agent results
 server.tool(
   "tot_commit",
-  "Submit results. States: EXPLORE (needs 2+ children), FOUND (needs 1+ VERIFY, R3+ only), VERIFY (confirms FOUND), DEAD.",
+  "Submit results. States: EXPLORE (needs 2+ children), FOUND (needs 1+ VERIFY, R4+ only), VERIFY (confirms FOUND), DEAD.",
   {
     sessionId: z.string().describe("Session ID"),
     results: z
       .array(
         z.object({
           nodeId: z.string().describe("Node ID"),
-          state: z.enum(["EXPLORE", "DEAD", "FOUND", "VERIFY"]).describe("EXPLORE=dig deeper (2+ children), FOUND=provisional solution (1+ VERIFY child, R3+ only), VERIFY=confirms FOUND, DEAD=dead end"),
+          state: z.enum(["EXPLORE", "DEAD", "FOUND", "VERIFY"]).describe("EXPLORE=dig deeper (2+ children), FOUND=provisional solution (1+ VERIFY child, R4+ only), VERIFY=confirms FOUND, DEAD=dead end"),
           findings: z.string().describe("What was discovered"),
         }),
       )
@@ -123,7 +122,7 @@ server.tool(
 // tot_end - Finalize investigation
 server.tool(
   "tot_end",
-  "End investigation. Requires round >= 3 and all EXPLORE nodes resolved.",
+  "End investigation. Requires round >= 5 and all EXPLORE nodes resolved.",
   {
     sessionId: z.string().describe("Session ID"),
   },
