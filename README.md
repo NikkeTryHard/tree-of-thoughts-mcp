@@ -54,7 +54,7 @@ Add to your Claude Code MCP settings (`~/.claude/settings.json`):
 
 ```
 1. tot_start    → Get sessionId, begin investigation
-2. tot_propose  → Declare nodes to investigate (max 5 per batch)
+2. tot_propose  → Declare nodes to investigate
 3. Spawn agents → Execute research for each node
 4. tot_commit   → Submit findings with state and agentId
 5. Repeat 2-4   → Until canEnd=true
@@ -72,11 +72,10 @@ Round 4: R4.A1a1 (parent: R3.A1a) - VERIFY node
 
 ## Rules
 
-1. **Max 5 nodes per batch** - Split larger investigations
-2. **Minimum 3 rounds** - Cannot end before Round 3
-3. **EXPLORE needs 2+ children** - Must branch for thorough coverage
-4. **FOUND only at R3+** - Earlier rounds auto-convert to EXPLORE
-5. **FOUND needs VERIFY** - Cannot end until findings are verified
+1. **Minimum 3 rounds** - Cannot end before Round 3
+2. **EXPLORE needs 2+ children** - Must branch for thorough coverage
+3. **FOUND only at R3+** - Earlier rounds auto-convert to EXPLORE
+4. **FOUND needs VERIFY** - Cannot end until findings are verified
 
 ## Example
 

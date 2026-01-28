@@ -14,7 +14,7 @@ export const proposeInputSchema = z.object({
         plannedAction: z.string().describe("What the agent will investigate"),
       }),
     )
-    .describe("Array of proposed nodes (max 5)"),
+    .describe("Array of proposed nodes"),
 });
 
 export type ProposeInput = z.infer<typeof proposeInputSchema>;
@@ -52,7 +52,7 @@ export async function handlePropose(input: ProposeInput, persistDir: string = ".
     plannedAction: n.plannedAction,
   }));
 
-  // Validate batch (max 5, no duplicates, valid parents)
+  // Validate batch (no duplicates, valid parents)
   const errors = Validator.validateProposedBatch(proposed, state);
 
   if (errors.length > 0) {

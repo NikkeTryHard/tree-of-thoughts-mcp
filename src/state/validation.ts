@@ -49,15 +49,6 @@ export class Validator {
   static validateProposedBatch(proposed: ProposedNode[], state: InvestigationState): ValidationError[] {
     const errors: ValidationError[] = [];
 
-    if (proposed.length > 5) {
-      errors.push({
-        nodeId: "BATCH",
-        error: "BATCH_OVERFLOW",
-        message: `Batch contains ${proposed.length} nodes, maximum is 5`,
-        suggestion: "Split into multiple batches of 5 or fewer",
-      });
-    }
-
     const ids = proposed.map((p) => p.id);
     const duplicates = ids.filter((id, i) => ids.indexOf(id) !== i);
     for (const dup of duplicates) {

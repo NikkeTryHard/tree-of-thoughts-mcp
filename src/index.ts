@@ -30,7 +30,7 @@ server.tool(
 // tot_propose - Validate batch before execution
 server.tool(
   "tot_propose",
-  "Propose nodes (max 5). Returns OK or REJECTED.",
+  "Propose nodes for investigation. Returns OK or REJECTED.",
   {
     sessionId: z.string().describe("Session ID"),
     nodes: z
@@ -42,7 +42,7 @@ server.tool(
           plannedAction: z.string().describe("What to investigate"),
         }),
       )
-      .describe("Nodes to propose (max 5)"),
+      .describe("Nodes to propose"),
   },
   async (input) => {
     const result = await handlePropose({ sessionId: input.sessionId, nodes: input.nodes }, PERSIST_DIR);

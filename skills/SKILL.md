@@ -17,7 +17,7 @@ description: Multi-path investigation with parallel agents
 
 ```
 1. tot_start → get sessionId
-2. tot_propose → declare nodes (max 5 per batch)
+2. tot_propose → declare nodes
 3. **SPAWN Task agents for EACH node** ← REQUIRED
 4. tot_commit → submit findings with state AND agentId
 5. Repeat 2-4 until canEnd=true
@@ -48,12 +48,11 @@ Round 4: R4.A1a1 (parent: R3.A1a) - VERIFY node
 
 ## Rules
 
-1. Max 5 nodes per batch
-2. Cannot end before round 3
-3. EXPLORE nodes need 2+ children
-4. **FOUND only at Round 3+** - Earlier rounds auto-convert to EXPLORE
-5. **FOUND needs 1+ VERIFY children** - Cannot end until verified
-6. Each node requires a real Task agent - no fabrication
+1. Cannot end before round 3
+2. EXPLORE nodes need 2+ children
+3. **FOUND only at Round 3+** - Earlier rounds auto-convert to EXPLORE
+4. **FOUND needs 1+ VERIFY children** - Cannot end until verified
+5. Each node requires a real Task agent - no fabrication
 
 ## Subagent Prompt Requirements
 
@@ -115,7 +114,6 @@ tot_end({ sessionId })
 | Error           | Fix                                            |
 | --------------- | ---------------------------------------------- |
 | NOT_PROPOSED    | Call tot_propose first                         |
-| BATCH_OVERFLOW  | Split into batches of 5                        |
 | TERMINAL_PARENT | Use tot_reclassify to change parent to EXPLORE |
 
 ## Warnings (Anti-Gaming)
