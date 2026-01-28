@@ -1,82 +1,57 @@
-# Tree of Thoughts MCP Server v2.0
+# Development Guide
 
-## States (4 states)
-
-| State   | Meaning              | Children | Terminal |
-| ------- | -------------------- | -------- | -------- |
-| EXPLORE | Dig deeper           | 2+       | No       |
-| FOUND   | Provisional solution | 1+ VERIFY| No       |
-| VERIFY  | Confirms FOUND       | 0        | Yes      |
-| DEAD    | Dead end             | 0        | Yes      |
-
-## Workflow
+## Architecture
 
 ```
-1. tot_start    → get sessionId
-2. tot_propose  → declare nodes (max 5)
-3. Spawn Task agents for EACH node
-4. tot_commit   → submit results with agentId
-5. Repeat 2-4 until canEnd=true
-6. tot_end      → finalize with references
+src/
+├── index.ts          # MCP server entry, tool registration
+├── types.ts          # NodeState enum, interfaces
+├── state/
+│   ├── investigation.ts  # Session persistence
+│   ├── validation.ts     # Rule enforcement
+│   └── dot-generator.ts  # Graph visualization
+└── tools/
+    ├── start.ts      # tot_start handler
+    ├── propose.ts    # tot_propose handler
+    ├── commit.ts     # tot_commit handler (depth enforcement)
+    ├── reclassify.ts # tot_reclassify handler
+    ├── status.ts     # tot_status handler
+    └── end.ts        # tot_end handler (reference extraction)
 ```
 
-## Node IDs
+## State Machine
 
-Format: `R[round].[suffix]`
+| State   | Terminal | Children | Color   |
+|---------|----------|----------|---------|
+| EXPLORE | No       | 2+       | lightblue |
+| FOUND   | No       | 1+ VERIFY| orange  |
+| VERIFY  | Yes      | 0        | green   |
+| DEAD    | Yes      | 0        | red     |
 
-- Round 1: R1.A, R1.B, R1.C (parent: null)
-- Round 2: R2.A1, R2.A2 (parent: R1.A)
-- Round 3: R3.A1a (parent: R2.A1) - can use FOUND here
-- Round 4: R4.A1a1 (parent: R3.A1a) - VERIFY node
+## Key Files
 
-## Rules
+- `types.ts` - `isTerminalState()` and `getRequiredChildren()` define state behavior
+- `commit.ts` - Depth enforcement (FOUND→EXPLORE before R3), timing warnings
+- `validation.ts` - `canEndInvestigation()` checks all rules
+- `end.ts` - `extractReferences()` parses URLs/paths from findings
 
-1. Max 5 nodes per batch
-2. Cannot end before round 3
-3. EXPLORE nodes need 2+ children
-4. FOUND only at R3+ (auto-converts to EXPLORE before)
-5. FOUND needs 1+ VERIFY children
+## Testing
 
-## Example
-
-```javascript
-tot_start({ query: "..." });
-
-tot_propose({
-  sessionId,
-  nodes: [
-    { id: "R1.A", parent: null, title: "...", plannedAction: "..." },
-    { id: "R1.B", parent: null, title: "...", plannedAction: "..." },
-  ],
-});
-
-// Spawn Task agents, then commit with agentId
-tot_commit({
-  sessionId,
-  results: [
-    { nodeId: "R1.A", state: "EXPLORE", findings: "...", agentId: "abc-123" },
-    { nodeId: "R1.B", state: "DEAD", findings: "...", agentId: "def-456" },
-  ],
-});
-
-// At R3+: use FOUND, then add VERIFY child
-tot_commit({
-  sessionId,
-  results: [
-    { nodeId: "R3.A1a", state: "FOUND", findings: "...", agentId: "..." },
-  ],
-});
-
-tot_propose({
-  sessionId,
-  nodes: [{ id: "R4.A1a1", parent: "R3.A1a", title: "Verify", plannedAction: "Confirm" }],
-});
-
-tot_commit({
-  sessionId,
-  results: [{ nodeId: "R4.A1a1", state: "VERIFY", findings: "Confirmed", agentId: "..." }],
-});
-
-// Now canEnd=true
-tot_end({ sessionId });
+```bash
+npm test              # Run all tests
+npm run build         # Build to dist/
 ```
+
+## Adding New Rules
+
+1. Add validation logic to `src/state/validation.ts`
+2. Update `canEndInvestigation()` if it affects ending
+3. Add tests to verify behavior
+4. Update SKILL.md and README if user-facing
+
+## Anti-Gaming Measures
+
+- `proposedAt` timestamp stored on propose
+- `MIN_RESEARCH_TIME_MS` check on commit (10s)
+- `agentId` tracking for audit trail
+- Warnings returned in commit response
