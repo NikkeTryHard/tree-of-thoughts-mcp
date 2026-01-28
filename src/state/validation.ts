@@ -97,8 +97,8 @@ export class Validator {
     canEnd: boolean;
     reason?: string;
   } {
-    // Rule 1: Minimum 3 rounds
-    if (state.data.currentRound < 3) {
+    // Rule 1: Minimum 5 rounds
+    if (state.data.currentRound < 5) {
       const allNodes = state.getAllNodes();
       const allTerminal = allNodes.every((n) => isTerminalState(n.state));
 
@@ -111,7 +111,7 @@ export class Validator {
 
       return {
         canEnd: false,
-        reason: `Round ${state.data.currentRound} < 3. Continue investigation.`,
+        reason: `Round ${state.data.currentRound} < 5. Continue investigation.`,
       };
     }
 
