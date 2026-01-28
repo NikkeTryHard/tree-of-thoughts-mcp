@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { InvestigationState } from "../state/investigation";
 import { DotGenerator } from "../state/dot-generator";
+import { Validator } from "../state/validation";
 import { NodeState, getRequiredChildren, isTerminalState, type ValidationError } from "../types";
 
 export const commitInputSchema = z.object({
@@ -91,6 +92,13 @@ export async function handleCommit(
       }
     }
   }
+
+  // Validate state availability (round-locked states)
+  const stateResults = input.results.map((r) => ({ nodeId: r.nodeId, state: r.state }));
+  errors.push(...Validator.validateStateAvailability(state, stateResults));
+
+  // Validate terminal ratio
+  errors.push(...Validator.validateTerminalRatio(state, stateResults));
 
   if (errors.length > 0) {
     return {

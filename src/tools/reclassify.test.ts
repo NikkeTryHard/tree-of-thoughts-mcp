@@ -18,7 +18,7 @@ describe("tot_reclassify", () => {
     const startResult = await handleStart({ query: "Test", minRoots: 2 }, TEST_DIR);
     sessionId = startResult.sessionId;
 
-    // Set up initial nodes
+    // Set up initial nodes - Round 1 requires 0% terminal, so use DRILL
     await handlePropose(
       {
         sessionId,
@@ -33,8 +33,33 @@ describe("tot_reclassify", () => {
       {
         sessionId,
         results: [
-          { nodeId: "R1.A", state: NodeState.DEAD, findings: "Dead", evidence: "This path is a dead end because the approach fundamentally cannot work due to technical limitations" },
-          { nodeId: "R1.B", state: NodeState.VALID, findings: "Valid", evidence: "This is a valid solution because it meets all requirements and has been verified through testing" },
+          { nodeId: "R1.A", state: NodeState.DRILL, findings: "Lead" },
+          { nodeId: "R1.B", state: NodeState.DRILL, findings: "Lead" },
+        ],
+      },
+      TEST_DIR
+    );
+
+    // Add children to complete round 1 and move to round 2
+    await handlePropose(
+      {
+        sessionId,
+        nodes: [
+          { id: "R2.A1", parent: "R1.A", title: "A1", plannedAction: "A1" },
+          { id: "R2.A2", parent: "R1.A", title: "A2", plannedAction: "A2" },
+          { id: "R2.A3", parent: "R1.A", title: "A3", plannedAction: "A3" },
+        ],
+      },
+      TEST_DIR
+    );
+    // Round 2 allows 35% terminal - 1 DEAD out of 3 = 33%
+    await handleCommit(
+      {
+        sessionId,
+        results: [
+          { nodeId: "R2.A1", state: NodeState.DEAD, findings: "Dead", evidence: "This path is a dead end because the approach fundamentally cannot work due to technical limitations" },
+          { nodeId: "R2.A2", state: NodeState.DRILL, findings: "Lead" },
+          { nodeId: "R2.A3", state: NodeState.DRILL, findings: "Lead" },
         ],
       },
       TEST_DIR
@@ -51,7 +76,7 @@ describe("tot_reclassify", () => {
     const result = await handleReclassify(
       {
         sessionId,
-        nodeId: "R1.A",
+        nodeId: "R2.A1",
         newState: NodeState.DRILL,
       },
       TEST_DIR
@@ -63,29 +88,7 @@ describe("tot_reclassify", () => {
   });
 
   test("rejects reclassification of node with children to terminal", async () => {
-    // First reclassify to DRILL
-    await handleReclassify(
-      { sessionId, nodeId: "R1.A", newState: NodeState.DRILL },
-      TEST_DIR
-    );
-
-    // Add a child
-    await handlePropose(
-      {
-        sessionId,
-        nodes: [{ id: "R2.A1", parent: "R1.A", title: "Child", plannedAction: "Do" }],
-      },
-      TEST_DIR
-    );
-    await handleCommit(
-      {
-        sessionId,
-        results: [{ nodeId: "R2.A1", state: NodeState.DEAD, findings: "Dead", evidence: "This path is a dead end because the approach fundamentally cannot work due to technical limitations" }],
-      },
-      TEST_DIR
-    );
-
-    // Try to reclassify parent to terminal
+    // R1.A already has children from beforeEach, try to reclassify it to DEAD
     const result = await handleReclassify(
       { sessionId, nodeId: "R1.A", newState: NodeState.DEAD },
       TEST_DIR
@@ -97,7 +100,7 @@ describe("tot_reclassify", () => {
 
   test("updates DOT graph after reclassification", async () => {
     const result = await handleReclassify(
-      { sessionId, nodeId: "R1.A", newState: NodeState.DRILL },
+      { sessionId, nodeId: "R2.A1", newState: NodeState.DRILL },
       TEST_DIR
     );
 

@@ -37,13 +37,13 @@ describe("tot_commit", () => {
       TEST_DIR
     );
 
-    // Then commit
+    // Then commit - Round 1 allows 0% terminal, so both must be non-terminal
     const result = await handleCommit(
       {
         sessionId,
         results: [
           { nodeId: "R1.A", state: NodeState.DRILL, findings: "Found something" },
-          { nodeId: "R1.B", state: NodeState.DEAD, findings: "Dead end", evidence: "This path is a dead end because the approach fundamentally cannot work due to technical limitations" },
+          { nodeId: "R1.B", state: NodeState.DRILL, findings: "More leads" },
         ],
       },
       TEST_DIR
@@ -145,6 +145,71 @@ describe("tot_commit", () => {
   });
 
   test("accepts terminal state with evidence", async () => {
+    // First, set up round 2 by completing round 1 with DRILL nodes
+    await handlePropose({
+      sessionId,
+      nodes: [
+        { id: "R1.A", parent: null, title: "A", plannedAction: "A" },
+        { id: "R1.B", parent: null, title: "B", plannedAction: "B" },
+      ],
+    }, TEST_DIR);
+
+    await handleCommit({
+      sessionId,
+      results: [
+        { nodeId: "R1.A", state: NodeState.DRILL, findings: "Lead" },
+        { nodeId: "R1.B", state: NodeState.DRILL, findings: "Lead" },
+      ],
+    }, TEST_DIR);
+
+    // Add all 6 children needed for round 1 (3 per DRILL node)
+    await handlePropose({
+      sessionId,
+      nodes: [
+        { id: "R2.A1", parent: "R1.A", title: "A1", plannedAction: "A1" },
+        { id: "R2.A2", parent: "R1.A", title: "A2", plannedAction: "A2" },
+        { id: "R2.A3", parent: "R1.A", title: "A3", plannedAction: "A3" },
+      ],
+    }, TEST_DIR);
+
+    await handleCommit({
+      sessionId,
+      results: [
+        { nodeId: "R2.A1", state: NodeState.DRILL, findings: "More" },
+        { nodeId: "R2.A2", state: NodeState.DRILL, findings: "More" },
+        { nodeId: "R2.A3", state: NodeState.DRILL, findings: "More" },
+      ],
+    }, TEST_DIR);
+
+    await handlePropose({
+      sessionId,
+      nodes: [
+        { id: "R2.B1", parent: "R1.B", title: "B1", plannedAction: "B1" },
+        { id: "R2.B2", parent: "R1.B", title: "B2", plannedAction: "B2" },
+        { id: "R2.B3", parent: "R1.B", title: "B3", plannedAction: "B3" },
+      ],
+    }, TEST_DIR);
+
+    // Now we're in round 2 - Round 2 allows 35% terminal - 1 DEAD out of 3 = 33% is OK
+    const result = await handleCommit({
+      sessionId,
+      results: [
+        {
+          nodeId: "R2.B1",
+          state: NodeState.DEAD,
+          findings: "Dead end",
+          evidence: "This path is definitively a dead end because X, Y, Z which are insurmountable obstacles",
+        },
+        { nodeId: "R2.B2", state: NodeState.DRILL, findings: "More" },
+        { nodeId: "R2.B3", state: NodeState.DRILL, findings: "More" },
+      ],
+    }, TEST_DIR);
+
+    expect(result.status).toBe("OK");
+  });
+
+  // Task 2.3: Round-locked state validation tests
+  test("rejects VALID before round 3 via commit", async () => {
     await handlePropose({
       sessionId,
       nodes: [
@@ -156,16 +221,34 @@ describe("tot_commit", () => {
     const result = await handleCommit({
       sessionId,
       results: [
-        {
-          nodeId: "R1.A",
-          state: NodeState.DEAD,
-          findings: "Dead end",
-          evidence: "This path is definitively a dead end because X, Y, Z which are insurmountable obstacles",
-        },
+        { nodeId: "R1.A", state: NodeState.VALID, findings: "Found", evidence: "This is detailed evidence with more than 50 characters for validation purposes" },
         { nodeId: "R1.B", state: NodeState.DRILL, findings: "More" },
       ],
     }, TEST_DIR);
 
-    expect(result.status).toBe("OK");
+    expect(result.status).toBe("REJECTED");
+    expect(result.errors.some((e) => e.error === "STATE_LOCKED")).toBe(true);
+  });
+
+  test("rejects batch exceeding terminal ratio via commit", async () => {
+    await handlePropose({
+      sessionId,
+      nodes: [
+        { id: "R1.A", parent: null, title: "A", plannedAction: "A" },
+        { id: "R1.B", parent: null, title: "B", plannedAction: "B" },
+      ],
+    }, TEST_DIR);
+
+    // Round 1 allows 0% terminal, but we're submitting 50% terminal (1 DEAD)
+    const result = await handleCommit({
+      sessionId,
+      results: [
+        { nodeId: "R1.A", state: NodeState.DEAD, findings: "Dead", evidence: "This path is a dead end because the approach fundamentally cannot work due to technical limitations" },
+        { nodeId: "R1.B", state: NodeState.DRILL, findings: "More" },
+      ],
+    }, TEST_DIR);
+
+    expect(result.status).toBe("REJECTED");
+    expect(result.errors.some((e) => e.error === "TERMINAL_RATIO_EXCEEDED")).toBe(true);
   });
 });

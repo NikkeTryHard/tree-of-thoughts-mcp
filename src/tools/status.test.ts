@@ -44,12 +44,13 @@ describe("tot_status", () => {
       },
       TEST_DIR
     );
+    // Round 1 allows 0% terminal, so both must be non-terminal
     await handleCommit(
       {
         sessionId,
         results: [
           { nodeId: "R1.A", state: NodeState.DRILL, findings: "Lead" },
-          { nodeId: "R1.B", state: NodeState.DEAD, findings: "Dead", evidence: "This path is a dead end because the approach fundamentally cannot work due to technical limitations" },
+          { nodeId: "R1.B", state: NodeState.DRILL, findings: "More leads" },
         ],
       },
       TEST_DIR
@@ -58,8 +59,8 @@ describe("tot_status", () => {
     const result = await handleStatus({ sessionId }, TEST_DIR);
 
     expect(result.totalNodes).toBe(2);
-    expect(result.activeDrills).toBe(1);
-    expect(result.terminalNodes).toBe(1);
+    expect(result.activeDrills).toBe(2);
+    expect(result.terminalNodes).toBe(0);
   });
 
   test("includes DOT graph", async () => {
@@ -73,12 +74,13 @@ describe("tot_status", () => {
       },
       TEST_DIR
     );
+    // Round 1 allows 0% terminal
     await handleCommit(
       {
         sessionId,
         results: [
           { nodeId: "R1.A", state: NodeState.DRILL, findings: "Lead" },
-          { nodeId: "R1.B", state: NodeState.DEAD, findings: "Dead", evidence: "This path is a dead end because the approach fundamentally cannot work due to technical limitations" },
+          { nodeId: "R1.B", state: NodeState.DRILL, findings: "More leads" },
         ],
       },
       TEST_DIR

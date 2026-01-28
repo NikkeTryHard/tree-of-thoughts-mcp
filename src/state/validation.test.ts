@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { Validator } from "./validation";
 import { InvestigationState } from "./investigation";
-import { NodeState, type ProposedNode } from "../types";
+import { NodeState, isPendingState, type ProposedNode } from "../types";
 
 const TEST_DIR = "./test-investigations";
 
@@ -170,5 +170,214 @@ describe("Validator", () => {
     });
     const result = Validator.canEndInvestigation(state);
     expect(result.canEnd).toBe(true);
+  });
+});
+
+describe("Terminal Ratio Validation", () => {
+  test("rejects batch with >35% terminal in round 2", () => {
+    const state = InvestigationState.create("Test", 2, TEST_DIR);
+    state.data.currentRound = 2;
+
+    // 3 nodes, all terminal = 100% > 35% limit
+    const results = [
+      { nodeId: "R2.A1", state: NodeState.DEAD },
+      { nodeId: "R2.A2", state: NodeState.DEAD },
+      { nodeId: "R2.A3", state: NodeState.DEAD },
+    ];
+
+    const errors = Validator.validateTerminalRatio(state, results);
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors[0].error).toBe("TERMINAL_RATIO_EXCEEDED");
+  });
+
+  test("allows batch with <=35% terminal in round 2", () => {
+    const state = InvestigationState.create("Test", 2, TEST_DIR);
+    state.data.currentRound = 2;
+
+    // 1 terminal out of 3 = 33%
+    const results = [
+      { nodeId: "R2.A1", state: NodeState.DRILL },
+      { nodeId: "R2.A2", state: NodeState.DRILL },
+      { nodeId: "R2.A3", state: NodeState.DEAD },
+    ];
+
+    const errors = Validator.validateTerminalRatio(state, results);
+    expect(errors.length).toBe(0);
+  });
+
+  test("allows 0% terminal in round 1", () => {
+    const state = InvestigationState.create("Test", 2, TEST_DIR);
+    state.data.currentRound = 1;
+
+    const results = [
+      { nodeId: "R1.A", state: NodeState.DRILL },
+      { nodeId: "R1.B", state: NodeState.DRILL },
+    ];
+
+    const errors = Validator.validateTerminalRatio(state, results);
+    expect(errors.length).toBe(0);
+  });
+
+  test("rejects any terminal in round 1 except DEAD", () => {
+    const state = InvestigationState.create("Test", 2, TEST_DIR);
+    state.data.currentRound = 1;
+
+    // Round 1 allows 0% terminal (DEAD is still terminal)
+    const results = [
+      { nodeId: "R1.A", state: NodeState.DEAD },
+    ];
+
+    const errors = Validator.validateTerminalRatio(state, results);
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors[0].error).toBe("TERMINAL_RATIO_EXCEEDED");
+  });
+
+  test("allows 50% terminal in round 3", () => {
+    const state = InvestigationState.create("Test", 2, TEST_DIR);
+    state.data.currentRound = 3;
+
+    // 2 terminal out of 4 = 50%
+    const results = [
+      { nodeId: "R3.A1", state: NodeState.DRILL },
+      { nodeId: "R3.A2", state: NodeState.DRILL },
+      { nodeId: "R3.A3", state: NodeState.DEAD },
+      { nodeId: "R3.A4", state: NodeState.VALID },
+    ];
+
+    const errors = Validator.validateTerminalRatio(state, results);
+    expect(errors.length).toBe(0);
+  });
+
+  test("allows 70% terminal in round 4+", () => {
+    const state = InvestigationState.create("Test", 2, TEST_DIR);
+    state.data.currentRound = 5;
+
+    // 7 terminal out of 10 = 70%
+    const results = [
+      { nodeId: "R5.A1", state: NodeState.DRILL },
+      { nodeId: "R5.A2", state: NodeState.DRILL },
+      { nodeId: "R5.A3", state: NodeState.DRILL },
+      { nodeId: "R5.A4", state: NodeState.DEAD },
+      { nodeId: "R5.A5", state: NodeState.DEAD },
+      { nodeId: "R5.A6", state: NodeState.DEAD },
+      { nodeId: "R5.A7", state: NodeState.DEAD },
+      { nodeId: "R5.A8", state: NodeState.VALID },
+      { nodeId: "R5.A9", state: NodeState.VALID },
+      { nodeId: "R5.A10", state: NodeState.VALID },
+    ];
+
+    const errors = Validator.validateTerminalRatio(state, results);
+    expect(errors.length).toBe(0);
+  });
+
+  test("treats VALID_PENDING as pending (counts toward terminal ratio)", () => {
+    const state = InvestigationState.create("Test", 2, TEST_DIR);
+    state.data.currentRound = 2;
+
+    // All VALID_PENDING = 100% pending > 35% limit
+    const results = [
+      { nodeId: "R2.A1", state: NodeState.VALID_PENDING },
+      { nodeId: "R2.A2", state: NodeState.VALID_PENDING },
+      { nodeId: "R2.A3", state: NodeState.VALID_PENDING },
+    ];
+
+    const errors = Validator.validateTerminalRatio(state, results);
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors[0].error).toBe("TERMINAL_RATIO_EXCEEDED");
+  });
+});
+
+describe("State Availability Validation", () => {
+  test("rejects VALID state before round 3", () => {
+    const state = InvestigationState.create("Test", 2, TEST_DIR);
+    state.data.currentRound = 2;
+
+    const results = [{ nodeId: "R2.A1", state: NodeState.VALID }];
+    const errors = Validator.validateStateAvailability(state, results);
+
+    expect(errors.length).toBe(1);
+    expect(errors[0].error).toBe("STATE_LOCKED");
+  });
+
+  test("rejects VALID_PENDING before round 3", () => {
+    const state = InvestigationState.create("Test", 2, TEST_DIR);
+    state.data.currentRound = 2;
+
+    const results = [{ nodeId: "R2.A1", state: NodeState.VALID_PENDING }];
+    const errors = Validator.validateStateAvailability(state, results);
+
+    expect(errors.length).toBe(1);
+    expect(errors[0].error).toBe("STATE_LOCKED");
+  });
+
+  test("rejects SPEC before round 3", () => {
+    const state = InvestigationState.create("Test", 2, TEST_DIR);
+    state.data.currentRound = 2;
+
+    const results = [{ nodeId: "R2.A1", state: NodeState.SPEC }];
+    const errors = Validator.validateStateAvailability(state, results);
+
+    expect(errors.length).toBe(1);
+    expect(errors[0].error).toBe("STATE_LOCKED");
+  });
+
+  test("allows VALID_PENDING at round 3+", () => {
+    const state = InvestigationState.create("Test", 2, TEST_DIR);
+    state.data.currentRound = 3;
+
+    const results = [{ nodeId: "R3.A1", state: NodeState.VALID_PENDING }];
+    const errors = Validator.validateStateAvailability(state, results);
+
+    expect(errors.length).toBe(0);
+  });
+
+  test("allows VALID at round 3+", () => {
+    const state = InvestigationState.create("Test", 2, TEST_DIR);
+    state.data.currentRound = 3;
+
+    const results = [{ nodeId: "R3.A1", state: NodeState.VALID }];
+    const errors = Validator.validateStateAvailability(state, results);
+
+    expect(errors.length).toBe(0);
+  });
+
+  test("allows SPEC at round 3+", () => {
+    const state = InvestigationState.create("Test", 2, TEST_DIR);
+    state.data.currentRound = 4;
+
+    const results = [{ nodeId: "R4.A1", state: NodeState.SPEC }];
+    const errors = Validator.validateStateAvailability(state, results);
+
+    expect(errors.length).toBe(0);
+  });
+
+  test("allows DEAD at any round", () => {
+    const state = InvestigationState.create("Test", 2, TEST_DIR);
+    state.data.currentRound = 1;
+
+    const results = [{ nodeId: "R1.A", state: NodeState.DEAD }];
+    const errors = Validator.validateStateAvailability(state, results);
+
+    expect(errors.length).toBe(0);
+  });
+
+  test("allows DRILL at any round", () => {
+    const state = InvestigationState.create("Test", 2, TEST_DIR);
+    state.data.currentRound = 1;
+
+    const results = [{ nodeId: "R1.A", state: NodeState.DRILL }];
+    const errors = Validator.validateStateAvailability(state, results);
+
+    expect(errors.length).toBe(0);
+  });
+
+  test("allows VERIFY at any round", () => {
+    const state = InvestigationState.create("Test", 2, TEST_DIR);
+    state.data.currentRound = 1;
+
+    const results = [{ nodeId: "R1.A", state: NodeState.VERIFY }];
+    const errors = Validator.validateStateAvailability(state, results);
+
+    expect(errors.length).toBe(0);
   });
 });

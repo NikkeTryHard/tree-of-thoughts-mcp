@@ -1,4 +1,4 @@
-import { NodeState, isTerminalState, getRequiredChildren, type ValidationError, type ProposedNode } from "../types";
+import { NodeState, isTerminalState, isPendingState, getRequiredChildren, type ValidationError, type ProposedNode } from "../types";
 import type { InvestigationState } from "./investigation";
 
 export class Validator {
@@ -198,6 +198,84 @@ export class Validator {
         message: `Round 1 requires at least ${state.data.minRoots} root nodes. Current: ${existingRoots}, Proposed: ${proposedCount}, Total: ${totalRoots}`,
         suggestion: `Add ${state.data.minRoots - totalRoots} more root nodes`,
       });
+    }
+
+    return errors;
+  }
+
+  static validateTerminalRatio(
+    state: InvestigationState,
+    results: Array<{ nodeId: string; state: NodeState }>
+  ): ValidationError[] {
+    const errors: ValidationError[] = [];
+
+    // Terminal ratio limits by round
+    const TERMINAL_LIMITS: Record<number, number> = {
+      1: 0.0,   // 0% terminal in round 1
+      2: 0.35,  // 35% terminal in round 2
+      3: 0.50,  // 50% terminal in round 3
+      4: 1.0,   // 100% terminal allowed in round 4+ (finishing phase)
+    };
+
+    // Determine the round from the node IDs (they should all be same round)
+    // Node IDs are formatted as R[round].[id], e.g., R1.A, R2.A1
+    const extractRound = (nodeId: string): number => {
+      const match = nodeId.match(/^R(\d+)\./);
+      return match ? parseInt(match[1], 10) : state.data.currentRound;
+    };
+
+    // Use the round from the first node, or fall back to current round
+    const round = results.length > 0 ? extractRound(results[0].nodeId) : state.data.currentRound;
+    const limit = TERMINAL_LIMITS[round] ?? TERMINAL_LIMITS[4];
+
+    const terminalCount = results.filter((r) =>
+      isTerminalState(r.state) || isPendingState(r.state)
+    ).length;
+
+    const ratio = results.length > 0 ? terminalCount / results.length : 0;
+
+    if (ratio > limit) {
+      errors.push({
+        nodeId: "BATCH",
+        error: "TERMINAL_RATIO_EXCEEDED",
+        message: `Round ${round} allows max ${Math.round(limit * 100)}% terminal states. Batch has ${Math.round(ratio * 100)}% (${terminalCount}/${results.length})`,
+        suggestion: "Mark more nodes as DRILL or VERIFY to continue exploration",
+      });
+    }
+
+    return errors;
+  }
+
+  static validateStateAvailability(
+    state: InvestigationState,
+    results: Array<{ nodeId: string; state: NodeState }>
+  ): ValidationError[] {
+    const errors: ValidationError[] = [];
+
+    // States locked until certain rounds
+    const STATE_UNLOCK_ROUND: Partial<Record<NodeState, number>> = {
+      [NodeState.VALID]: 3,
+      [NodeState.VALID_PENDING]: 3,
+      [NodeState.SPEC]: 3,
+    };
+
+    // Extract round from node ID (format: R[round].[id])
+    const extractRound = (nodeId: string): number => {
+      const match = nodeId.match(/^R(\d+)\./);
+      return match ? parseInt(match[1], 10) : state.data.currentRound;
+    };
+
+    for (const result of results) {
+      const unlockRound = STATE_UNLOCK_ROUND[result.state];
+      const nodeRound = extractRound(result.nodeId);
+      if (unlockRound && nodeRound < unlockRound) {
+        errors.push({
+          nodeId: result.nodeId,
+          error: "STATE_LOCKED",
+          message: `${result.state} is not available until round ${unlockRound}. Node round: ${nodeRound}`,
+          suggestion: "Use DRILL or VERIFY to continue exploration, or DEAD if truly a dead end",
+        });
+      }
     }
 
     return errors;
