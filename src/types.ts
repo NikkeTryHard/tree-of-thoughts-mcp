@@ -1,21 +1,30 @@
 export enum NodeState {
   EXPLORE = "EXPLORE", // Needs 2+ children to investigate further
   DEAD = "DEAD", // Dead end, no more exploration needed
-  FOUND = "FOUND", // Solution/answer discovered
+  FOUND = "FOUND", // Provisional solution, needs 1+ VERIFY children
+  VERIFY = "VERIFY", // Confirms parent FOUND node
 }
 
 export const STATE_COLORS: Record<NodeState, string> = {
   [NodeState.EXPLORE]: "lightblue",
   [NodeState.DEAD]: "red",
-  [NodeState.FOUND]: "green",
+  [NodeState.FOUND]: "orange", // Changed from green - provisional
+  [NodeState.VERIFY]: "green", // Verified solution
 };
 
 export function isTerminalState(state: NodeState): boolean {
-  return state === NodeState.DEAD || state === NodeState.FOUND;
+  return state === NodeState.DEAD || state === NodeState.VERIFY;
 }
 
 export function getRequiredChildren(state: NodeState): number {
-  return state === NodeState.EXPLORE ? 2 : 0;
+  switch (state) {
+    case NodeState.EXPLORE:
+      return 2;
+    case NodeState.FOUND:
+      return 1; // Needs VERIFY child
+    default:
+      return 0;
+  }
 }
 
 export interface ToTNode {
