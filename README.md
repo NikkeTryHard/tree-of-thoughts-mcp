@@ -4,7 +4,7 @@ A Model Context Protocol (MCP) server that enables structured multi-path investi
 
 ## Features
 
-- **Structured Investigation** - Organize research into rounds with parent-child relationships
+- **Single Root Paradigm** - Start with one root, branch wide at R2
 - **4-State System** - EXPLORE, FOUND, VERIFY, DEAD states enforce thorough investigation
 - **Anti-Gaming Measures** - Timing checks and agentId tracking prevent shortcut-taking
 - **Reference Extraction** - Automatically collects URLs and file paths from findings
@@ -50,32 +50,35 @@ Add to your Claude Code MCP settings (`~/.claude/settings.json`):
 
 **Key insight:** FOUND is NOT terminal. Every promising finding must be verified before the investigation can end.
 
-## Workflow
+## Workflow (Single Root Paradigm)
 
 ```
 1. tot_start    → Get sessionId, begin investigation
-2. tot_propose  → Declare nodes to investigate
-3. Spawn agents → Execute research for each node
-4. tot_commit   → Submit findings with state and agentId
-5. Repeat 2-4   → Until canEnd=true
-6. tot_end      → Finalize and get results with references
+2. tot_propose  → Declare single root R1.A
+3. Spawn agent  → Execute research for R1.A
+4. tot_commit   → Submit as EXPLORE
+5. tot_propose  → Branch into 3-5 children at R2
+6. Repeat       → Continue until R4+ for FOUND, R5+ to end
+7. tot_end      → Finalize and get results with references
 ```
 
 ## Node ID Format
 
 ```
-Round 1: R1.A, R1.B, R1.C (parent: null)
-Round 2: R2.A1, R2.A2 (parent: R1.A)
-Round 3: R3.A1a (parent: R2.A1) - can use FOUND here
-Round 4: R4.A1a1 (parent: R3.A1a) - VERIFY node
+Round 1: R1.A (single root, parent: null)
+Round 2: R2.A1, R2.A2, R2.A3 (branch wide from R1.A)
+Round 3: R3.A1a (parent: R2.A1)
+Round 4: R4.A1a1 (parent: R3.A1a) - can use FOUND here
+Round 5: R5.A1a1a (parent: R4.A1a1) - VERIFY node
 ```
 
 ## Rules
 
-1. **Minimum 3 rounds** - Cannot end before Round 3
-2. **EXPLORE needs 2+ children** - Must branch for thorough coverage
-3. **FOUND only at R3+** - Earlier rounds auto-convert to EXPLORE
-4. **FOUND needs VERIFY** - Cannot end until findings are verified
+1. **Single root R1.A** - Then branch wide at R2
+2. **Minimum 5 rounds** - Cannot end before Round 5
+3. **EXPLORE needs 2+ children** - Must branch for thorough coverage
+4. **FOUND only at R4+** - Earlier rounds auto-convert to EXPLORE
+5. **FOUND needs VERIFY** - Cannot end until findings are verified
 
 ## Example
 
@@ -83,31 +86,34 @@ Round 4: R4.A1a1 (parent: R3.A1a) - VERIFY node
 // Start investigation
 tot_start({ query: "How to optimize database queries?" })
 
-// Round 1: Propose root paths
+// Round 1: Single root
 tot_propose({ sessionId, nodes: [
-  { id: "R1.A", parent: null, title: "Index Analysis", plannedAction: "Analyze missing indexes" },
-  { id: "R1.B", parent: null, title: "Query Patterns", plannedAction: "Review query patterns" },
-  { id: "R1.C", parent: null, title: "Schema Design", plannedAction: "Evaluate schema" }
+  { id: "R1.A", parent: null, title: "Query Optimization", plannedAction: "Analyze problem" }
 ]})
-
-// Spawn Task agents for each node, then commit
 tot_commit({ sessionId, results: [
-  { nodeId: "R1.A", state: "EXPLORE", findings: "Found 3 missing indexes...", agentId: "abc-123" },
-  { nodeId: "R1.B", state: "DEAD", findings: "Queries already optimized", agentId: "def-456" },
-  { nodeId: "R1.C", state: "EXPLORE", findings: "Normalization issues...", agentId: "ghi-789" }
+  { nodeId: "R1.A", state: "EXPLORE", findings: "Found multiple paths...", agentId: "abc-123" }
 ]})
 
-// Continue until Round 3+, then use FOUND
-tot_commit({ sessionId, results: [
-  { nodeId: "R3.A1a", state: "FOUND", findings: "Solution: Add composite index on...", agentId: "..." }
-]})
-
-// Verify the finding
+// Round 2: Branch wide
 tot_propose({ sessionId, nodes: [
-  { id: "R4.A1a1", parent: "R3.A1a", title: "Verify Index", plannedAction: "Test performance" }
+  { id: "R2.A1", parent: "R1.A", title: "Index Analysis", plannedAction: "Analyze indexes" },
+  { id: "R2.A2", parent: "R1.A", title: "Query Patterns", plannedAction: "Review patterns" },
+  { id: "R2.A3", parent: "R1.A", title: "Schema Design", plannedAction: "Evaluate schema" }
+]})
+
+// Continue through R3, R4...
+
+// Round 4+: Use FOUND
+tot_commit({ sessionId, results: [
+  { nodeId: "R4.A1a1", state: "FOUND", findings: "Solution: Add composite index...", agentId: "..." }
+]})
+
+// Round 5: Verify the finding
+tot_propose({ sessionId, nodes: [
+  { id: "R5.A1a1a", parent: "R4.A1a1", title: "Verify Index", plannedAction: "Test performance" }
 ]})
 tot_commit({ sessionId, results: [
-  { nodeId: "R4.A1a1", state: "VERIFY", findings: "Confirmed: 10x improvement", agentId: "..." }
+  { nodeId: "R5.A1a1a", state: "VERIFY", findings: "Confirmed: 10x improvement", agentId: "..." }
 ]})
 
 // End when canEnd=true
@@ -122,7 +128,7 @@ The server includes protections against agents taking shortcuts:
 |----------------|--------------------------------------|
 | SUSPICIOUS     | Commit within 10s of propose         |
 | MISSING_AGENT  | No agentId provided                  |
-| DEPTH_ENFORCED | FOUND before R3 (auto-converts)      |
+| DEPTH_ENFORCED | FOUND before R4 (auto-converts)      |
 
 ## Claude Code Skill
 

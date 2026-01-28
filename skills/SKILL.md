@@ -13,15 +13,19 @@ description: Multi-path investigation with parallel agents
 - Missing agentId triggers MISSING_AGENT warnings
 - Fabricating findings without research is PROHIBITED
 
-## Workflow
+## Workflow (Single Root Paradigm)
 
 ```
 1. tot_start → get sessionId
-2. tot_propose → declare nodes
-3. **SPAWN Task agents for EACH node** ← REQUIRED
-4. tot_commit → submit findings with state AND agentId
-5. Repeat 2-4 until canEnd=true
-6. tot_end → get final results with references
+2. tot_propose → declare single root R1.A
+3. **SPAWN Task agent for R1.A** ← REQUIRED
+4. tot_commit → submit findings as EXPLORE
+5. tot_propose → branch into 3-5 children at R2
+6. Repeat spawning agents and committing
+7. At R4+ you can use FOUND state
+8. Add VERIFY child for each FOUND
+9. Continue until R5+ and canEnd=true
+10. tot_end → get final results with references
 ```
 
 ## States (4 states)
@@ -40,19 +44,21 @@ description: Multi-path investigation with parallel agents
 Format: `R[round].[suffix]`
 
 ```
-Round 1: R1.A, R1.B, R1.C (parent: null)
-Round 2: R2.A1, R2.A2 (parent: R1.A)
-Round 3: R3.A1a (parent: R2.A1) - can use FOUND here
-Round 4: R4.A1a1 (parent: R3.A1a) - VERIFY node
+Round 1: R1.A (single root, parent: null)
+Round 2: R2.A1, R2.A2, R2.A3 (branch wide from R1.A)
+Round 3: R3.A1a, R3.A1b (parent: R2.A1)
+Round 4: R4.A1a1 (parent: R3.A1a) - can use FOUND here
+Round 5: R5.A1a1a (parent: R4.A1a1) - VERIFY node
 ```
 
 ## Rules
 
-1. Cannot end before round 3
-2. EXPLORE nodes need 2+ children
-3. **FOUND only at Round 3+** - Earlier rounds auto-convert to EXPLORE
-4. **FOUND needs 1+ VERIFY children** - Cannot end until verified
-5. Each node requires a real Task agent - no fabrication
+1. **Single root R1.A** - then branch wide at R2
+2. **Cannot end before round 5** - forces thorough investigation
+3. **EXPLORE nodes need 2+ children**
+4. **FOUND only at Round 4+** - Earlier rounds auto-convert to EXPLORE
+5. **FOUND needs 1+ VERIFY children** - Cannot end until verified
+6. Each node requires a real Task agent - no fabrication
 
 ## Subagent Prompt Requirements
 
@@ -77,32 +83,34 @@ Format:
 // Start
 tot_start({ query: "..." })
 
-// Round 1: Propose roots
+// Round 1: Single root
 tot_propose({ sessionId, nodes: [
-  { id: "R1.A", parent: null, title: "...", plannedAction: "..." },
-  { id: "R1.B", parent: null, title: "...", plannedAction: "..." },
-  { id: "R1.C", parent: null, title: "...", plannedAction: "..." }
+  { id: "R1.A", parent: null, title: "Main query", plannedAction: "Analyze problem" }
 ]})
-
-// Spawn agents with reference requirement in prompt
-// Commit with agentId
 tot_commit({ sessionId, results: [
-  { nodeId: "R1.A", state: "EXPLORE", findings: "...\n\n## References\n- ...", agentId: "abc-123" },
-  { nodeId: "R1.B", state: "DEAD", findings: "...", agentId: "def-456" },
-  { nodeId: "R1.C", state: "EXPLORE", findings: "...", agentId: "ghi-789" }
+  { nodeId: "R1.A", state: "EXPLORE", findings: "...", agentId: "abc-123" }
 ]})
 
-// Round 3+: Can use FOUND
-tot_commit({ sessionId, results: [
-  { nodeId: "R3.A1a", state: "FOUND", findings: "Solution found...", agentId: "..." }
-]})
-
-// Round 4: VERIFY the FOUND
+// Round 2: Branch wide
 tot_propose({ sessionId, nodes: [
-  { id: "R4.A1a1", parent: "R3.A1a", title: "Verify solution", plannedAction: "Confirm findings" }
+  { id: "R2.A1", parent: "R1.A", title: "Path 1", plannedAction: "..." },
+  { id: "R2.A2", parent: "R1.A", title: "Path 2", plannedAction: "..." },
+  { id: "R2.A3", parent: "R1.A", title: "Path 3", plannedAction: "..." }
+]})
+
+// Continue through R3, R4...
+
+// Round 4+: Can use FOUND
+tot_commit({ sessionId, results: [
+  { nodeId: "R4.A1a1", state: "FOUND", findings: "Solution found...", agentId: "..." }
+]})
+
+// Round 5: VERIFY the FOUND
+tot_propose({ sessionId, nodes: [
+  { id: "R5.A1a1a", parent: "R4.A1a1", title: "Verify solution", plannedAction: "Confirm findings" }
 ]})
 tot_commit({ sessionId, results: [
-  { nodeId: "R4.A1a1", state: "VERIFY", findings: "Confirmed: ...", agentId: "..." }
+  { nodeId: "R5.A1a1a", state: "VERIFY", findings: "Confirmed: ...", agentId: "..." }
 ]})
 
 // Now canEnd=true
@@ -122,4 +130,4 @@ tot_end({ sessionId })
 | -------------- | --------------------------------------------------- |
 | SUSPICIOUS     | Commit too fast after propose - no real research    |
 | MISSING_AGENT  | No agentId provided - cannot verify research        |
-| DEPTH_ENFORCED | FOUND before R3 converted to EXPLORE - add children |
+| DEPTH_ENFORCED | FOUND before R4 converted to EXPLORE - add children |

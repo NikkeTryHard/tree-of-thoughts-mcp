@@ -11,9 +11,9 @@ src/
 │   ├── validation.ts     # Rule enforcement
 │   └── dot-generator.ts  # Graph visualization
 └── tools/
-    ├── start.ts      # tot_start handler
+    ├── start.ts      # tot_start handler (single root)
     ├── propose.ts    # tot_propose handler
-    ├── commit.ts     # tot_commit handler (depth enforcement)
+    ├── commit.ts     # tot_commit handler (depth enforcement R4+)
     ├── reclassify.ts # tot_reclassify handler
     ├── status.ts     # tot_status handler
     └── end.ts        # tot_end handler (reference extraction)
@@ -31,8 +31,8 @@ src/
 ## Key Files
 
 - `types.ts` - `isTerminalState()` and `getRequiredChildren()` define state behavior
-- `commit.ts` - Depth enforcement (FOUND→EXPLORE before R3), timing warnings
-- `validation.ts` - `canEndInvestigation()` checks all rules
+- `commit.ts` - Depth enforcement (FOUND->EXPLORE before R4), timing warnings
+- `validation.ts` - `canEndInvestigation()` checks all rules (min 5 rounds)
 - `end.ts` - `extractReferences()` parses URLs/paths from findings
 
 ## Testing
@@ -55,3 +55,10 @@ npm run build         # Build to dist/
 - `MIN_RESEARCH_TIME_MS` check on commit (10s)
 - `agentId` tracking for audit trail
 - Warnings returned in commit response
+
+## Single Root Paradigm
+
+- Always start with single root R1.A
+- Branch into 3-5 children at R2
+- FOUND only allowed at R4+
+- Minimum 5 rounds before ending
