@@ -42,6 +42,7 @@ export interface ProposedNode {
   parent: string | null;
   title: string;
   plannedAction: string;
+  proposedAt: number; // Unix timestamp when proposed
 }
 
 export interface CommitResult {

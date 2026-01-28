@@ -1,5 +1,18 @@
 import { describe, it, expect } from "bun:test";
-import { NodeState, isTerminalState, getRequiredChildren } from "./types";
+import { NodeState, isTerminalState, getRequiredChildren, type ProposedNode, type CommitResult } from "./types";
+
+describe("ProposedNode", () => {
+  it("should have proposedAt field", () => {
+    const proposal: ProposedNode = {
+      id: "R1.A",
+      parent: null,
+      title: "Test",
+      plannedAction: "Test action",
+      proposedAt: Date.now(),
+    };
+    expect(proposal.proposedAt).toBeTypeOf("number");
+  });
+});
 
 describe("VERIFY state", () => {
   it("VERIFY is terminal", () => {
