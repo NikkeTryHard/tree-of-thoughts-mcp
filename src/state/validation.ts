@@ -1,5 +1,6 @@
 import { NodeState, isTerminalState, isPendingState, getRequiredChildren, type ValidationError, type ProposedNode } from "../types";
 import type { InvestigationState } from "./investigation";
+import { QualityCalculator } from "./quality";
 
 export class Validator {
   static validateProposedNode(
@@ -139,6 +140,7 @@ export class Validator {
   static canEndInvestigation(state: InvestigationState): {
     canEnd: boolean;
     reason?: string;
+    qualityScore?: number;
   } {
     if (state.data.currentRound < 3) {
       const allNodes = state.getAllNodes();
@@ -180,7 +182,19 @@ export class Validator {
       };
     }
 
-    return { canEnd: true };
+    // Quality gate - require minimum composite score
+    const quality = QualityCalculator.calculate(state);
+    const MIN_QUALITY_SCORE = 0.5;
+
+    if (quality.compositeScore < MIN_QUALITY_SCORE) {
+      return {
+        canEnd: false,
+        reason: `Investigation quality score ${quality.compositeScore.toFixed(2)} is below minimum ${MIN_QUALITY_SCORE}. Depth: ${quality.depthScore.toFixed(2)}, Breadth: ${quality.breadthScore.toFixed(2)}, Balance: ${quality.balanceScore.toFixed(2)}`,
+        qualityScore: quality.compositeScore,
+      };
+    }
+
+    return { canEnd: true, qualityScore: quality.compositeScore };
   }
 
   static validateMinRoots(
