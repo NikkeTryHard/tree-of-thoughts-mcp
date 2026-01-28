@@ -7,6 +7,33 @@ import { NodeState } from "../types";
 
 const TEST_DIR = "./test-commit-investigations";
 
+describe("anti-gaming: timing", () => {
+  beforeEach(() => {
+    mkdirSync(TEST_DIR, { recursive: true });
+  });
+
+  afterEach(() => {
+    rmSync(TEST_DIR, { recursive: true, force: true });
+  });
+
+  it("warns SUSPICIOUS if commit within 10 seconds of propose", async () => {
+    const start = await handleStart({ query: "Test" }, TEST_DIR);
+
+    await handlePropose({
+      sessionId: start.sessionId,
+      nodes: [{ id: "R1.A", parent: null, title: "Test", plannedAction: "Test" }],
+    }, TEST_DIR);
+
+    // Immediate commit (no agent spawned)
+    const result = await handleCommit({
+      sessionId: start.sessionId,
+      results: [{ nodeId: "R1.A", state: NodeState.EXPLORE, findings: "Fake" }],
+    }, TEST_DIR);
+
+    expect(result.warnings.some(w => w.includes("SUSPICIOUS"))).toBe(true);
+  });
+});
+
 describe("depth enforcement", () => {
   beforeEach(() => {
     mkdirSync(TEST_DIR, { recursive: true });

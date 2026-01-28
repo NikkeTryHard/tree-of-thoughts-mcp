@@ -4,6 +4,8 @@ import { DotGenerator } from "../state/dot-generator";
 import { Validator } from "../state/validation";
 import { NodeState, getRequiredChildren, isTerminalState, type ValidationError } from "../types";
 
+const MIN_RESEARCH_TIME_MS = 10000; // 10 seconds minimum
+
 export const commitInputSchema = z.object({
   sessionId: z.string().describe("The investigation session ID"),
   results: z
@@ -77,6 +79,17 @@ export async function handleCommit(input: CommitInput, persistDir: string = "./i
       pendingExplore: [],
       message: `Commit rejected: ${errors.length} error(s)`,
     };
+  }
+
+  // Anti-gaming: Check timing - warn if committed too fast
+  for (const result of input.results) {
+    const proposal = state.getPendingProposal(result.nodeId);
+    if (proposal) {
+      const elapsed = Date.now() - proposal.proposedAt;
+      if (elapsed < MIN_RESEARCH_TIME_MS) {
+        warnings.push(`SUSPICIOUS: ${result.nodeId} committed ${Math.round(elapsed / 1000)}s after propose (min ${MIN_RESEARCH_TIME_MS / 1000}s). Was an agent actually spawned?`);
+      }
+    }
   }
 
   // Depth enforcement: FOUND only allowed at Round 4+
