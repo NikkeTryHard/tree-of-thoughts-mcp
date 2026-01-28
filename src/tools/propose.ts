@@ -71,9 +71,9 @@ export async function handlePropose(input: ProposeInput, persistDir: string = ".
   state.save();
 
   return {
+    message: `NEXT: Spawn Task agents for ${proposed.map((n) => n.id).join(", ")}. Then call tot_commit with agentIds.`,
     status: "OK",
-    errors: [],
     approvedNodes: proposed.map((n) => n.id),
-    message: `Approved: ${proposed.map((n) => n.id).join(", ")}. Spawn agents, then call tot_commit.`,
+    errors: [],
   };
 }

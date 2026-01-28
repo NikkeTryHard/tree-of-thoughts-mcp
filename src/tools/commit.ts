@@ -154,12 +154,12 @@ export async function handleCommit(input: CommitInput, persistDir: string = "./i
   const canEndResult = Validator.canEndInvestigation(state);
 
   return {
+    message: canEndResult.canEnd ? "Ready to end. Call tot_end." : `CONTINUE REQUIRED: ${pendingExplore.length} EXPLORE nodes need children. Do NOT present results yet.`,
     status: "OK",
-    errors: [],
     warnings,
     currentRound: state.data.currentRound,
     canEnd: canEndResult.canEnd,
     pendingExplore,
-    message: canEndResult.canEnd ? "Ready to end. Call tot_end." : `Continue: ${pendingExplore.length} EXPLORE nodes need children.`,
+    errors: [],
   };
 }
