@@ -79,8 +79,8 @@ export async function handleCommit(input: CommitInput, persistDir: string = "./i
     };
   }
 
-  // Depth enforcement: FOUND only allowed at Round 3+
-  const MIN_DEPTH_FOR_FOUND = 3;
+  // Depth enforcement: FOUND only allowed at Round 4+
+  const MIN_DEPTH_FOR_FOUND = 4;
   const processedResults = input.results.map((result) => {
     const roundMatch = result.nodeId.match(/^R(\d+)\./);
     const round = roundMatch ? parseInt(roundMatch[1], 10) : 1;
