@@ -132,7 +132,7 @@ The server includes protections against agents taking shortcuts:
 
 ## Claude Code Skill
 
-Copy `skills/SKILL.md` to `~/.claude/skills/tree-of-thoughts/SKILL.md` to enable the `/tree-of-thoughts` command in Claude Code.
+Skills are located in the `tree-of-thoughts/` folder. Copy `tree-of-thoughts/SKILL.md` to `~/.claude/skills/tree-of-thoughts/SKILL.md` to enable the `/tree-of-thoughts` command in Claude Code.
 
 ## Development
 
