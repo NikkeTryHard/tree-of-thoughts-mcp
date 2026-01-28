@@ -43,7 +43,7 @@ describe("tot_commit", () => {
         sessionId,
         results: [
           { nodeId: "R1.A", state: NodeState.DRILL, findings: "Found something" },
-          { nodeId: "R1.B", state: NodeState.DEAD, findings: "Dead end" },
+          { nodeId: "R1.B", state: NodeState.DEAD, findings: "Dead end", evidence: "This path is a dead end because the approach fundamentally cannot work due to technical limitations" },
         ],
       },
       TEST_DIR
@@ -77,8 +77,8 @@ describe("tot_commit", () => {
       TEST_DIR
     );
 
-    // 2 DRILL nodes = 4 children needed for current round
-    expect(result.nextRoundInfo.nodesRequired).toBe(4);
+    // 2 DRILL nodes = 6 children needed for current round (3 each)
+    expect(result.nextRoundInfo.nodesRequired).toBe(6);
     // Round stays at 1 until children are added
     expect(result.currentRound).toBe(1);
   });
@@ -106,8 +106,8 @@ describe("tot_commit", () => {
       TEST_DIR
     );
 
-    // 4 nodes needed, 5 per batch = 1 batch
-    expect(result.nextRoundInfo.totalBatches).toBe(1);
+    // 6 nodes needed, 5 per batch = 2 batches
+    expect(result.nextRoundInfo.totalBatches).toBe(2);
   });
 
   test("rejects invalid session", async () => {
@@ -120,5 +120,52 @@ describe("tot_commit", () => {
     );
 
     expect(result.status).toBe("REJECTED");
+  });
+
+  // Task 1.3: Evidence validation tests
+  test("rejects terminal state without evidence", async () => {
+    await handlePropose({
+      sessionId,
+      nodes: [
+        { id: "R1.A", parent: null, title: "A", plannedAction: "A" },
+        { id: "R1.B", parent: null, title: "B", plannedAction: "B" },
+      ],
+    }, TEST_DIR);
+
+    const result = await handleCommit({
+      sessionId,
+      results: [
+        { nodeId: "R1.A", state: NodeState.DEAD, findings: "Dead end" },
+        { nodeId: "R1.B", state: NodeState.DRILL, findings: "More" },
+      ],
+    }, TEST_DIR);
+
+    expect(result.status).toBe("REJECTED");
+    expect(result.errors.some((e) => e.error === "MISSING_EVIDENCE")).toBe(true);
+  });
+
+  test("accepts terminal state with evidence", async () => {
+    await handlePropose({
+      sessionId,
+      nodes: [
+        { id: "R1.A", parent: null, title: "A", plannedAction: "A" },
+        { id: "R1.B", parent: null, title: "B", plannedAction: "B" },
+      ],
+    }, TEST_DIR);
+
+    const result = await handleCommit({
+      sessionId,
+      results: [
+        {
+          nodeId: "R1.A",
+          state: NodeState.DEAD,
+          findings: "Dead end",
+          evidence: "This path is definitively a dead end because X, Y, Z which are insurmountable obstacles",
+        },
+        { nodeId: "R1.B", state: NodeState.DRILL, findings: "More" },
+      ],
+    }, TEST_DIR);
+
+    expect(result.status).toBe("OK");
   });
 });

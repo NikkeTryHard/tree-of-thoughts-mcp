@@ -49,7 +49,7 @@ describe("tot_status", () => {
         sessionId,
         results: [
           { nodeId: "R1.A", state: NodeState.DRILL, findings: "Lead" },
-          { nodeId: "R1.B", state: NodeState.DEAD, findings: "Dead" },
+          { nodeId: "R1.B", state: NodeState.DEAD, findings: "Dead", evidence: "This path is a dead end because the approach fundamentally cannot work due to technical limitations" },
         ],
       },
       TEST_DIR
@@ -78,7 +78,7 @@ describe("tot_status", () => {
         sessionId,
         results: [
           { nodeId: "R1.A", state: NodeState.DRILL, findings: "Lead" },
-          { nodeId: "R1.B", state: NodeState.DEAD, findings: "Dead" },
+          { nodeId: "R1.B", state: NodeState.DEAD, findings: "Dead", evidence: "This path is a dead end because the approach fundamentally cannot work due to technical limitations" },
         ],
       },
       TEST_DIR

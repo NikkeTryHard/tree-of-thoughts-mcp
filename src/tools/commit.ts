@@ -11,6 +11,9 @@ export const commitInputSchema = z.object({
         nodeId: z.string().describe("The node ID that was executed"),
         state: z.nativeEnum(NodeState).describe("The resulting state"),
         findings: z.string().describe("What the agent discovered"),
+        evidence: z.string().optional().describe("Detailed evidence supporting terminal states (min 50 chars for terminal states)"),
+        verificationMethod: z.string().optional().describe("How the conclusion was verified"),
+        alternativesConsidered: z.array(z.string()).optional().describe("Alternative approaches that were considered"),
       })
     )
     .describe("Results from executed agents"),
@@ -71,6 +74,21 @@ export async function handleCommit(
         message: `Node ${result.nodeId} was not proposed. Call tot_propose first.`,
         suggestion: "Ensure all nodes are proposed before committing",
       });
+    }
+  }
+
+  // Validate evidence for terminal states (min 50 chars)
+  const MIN_EVIDENCE_LENGTH = 50;
+  for (const result of input.results) {
+    if (isTerminalState(result.state)) {
+      if (!result.evidence || result.evidence.length < MIN_EVIDENCE_LENGTH) {
+        errors.push({
+          nodeId: result.nodeId,
+          error: "MISSING_EVIDENCE",
+          message: `Terminal state ${result.state} requires evidence (min ${MIN_EVIDENCE_LENGTH} chars)`,
+          suggestion: "Provide detailed evidence explaining why this conclusion was reached",
+        });
+      }
     }
   }
 

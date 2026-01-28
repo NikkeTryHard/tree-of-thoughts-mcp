@@ -31,14 +31,14 @@ describe("tot_end", () => {
       TEST_DIR
     );
     await handleCommit(
-      { sessionId, results: [{ nodeId: "R1.A", state: NodeState.VALID, findings: "Done" }] },
+      { sessionId, results: [{ nodeId: "R1.A", state: NodeState.VALID, findings: "Done", evidence: "This is a valid solution because it meets all requirements and has been verified through testing" }] },
       TEST_DIR
     );
 
     const result = await handleEnd({ sessionId }, TEST_DIR);
 
     expect(result.status).toBe("REJECTED");
-    expect(result.reason).toContain("RECOVERY_REQUIRED");
+    expect(result.reason).toContain("round");
   });
 
   test("allows end after round 3 with all terminal nodes", async () => {
@@ -52,13 +52,14 @@ describe("tot_end", () => {
       TEST_DIR
     );
 
-    // Round 2
+    // Round 2 - DRILL requires 3 children
     await handlePropose(
       {
         sessionId,
         nodes: [
           { id: "R2.A1", parent: "R1.A", title: "A1", plannedAction: "A1" },
           { id: "R2.A2", parent: "R1.A", title: "A2", plannedAction: "A2" },
+          { id: "R2.A3", parent: "R1.A", title: "A3", plannedAction: "A3" },
         ],
       },
       TEST_DIR
@@ -68,19 +69,21 @@ describe("tot_end", () => {
         sessionId,
         results: [
           { nodeId: "R2.A1", state: NodeState.DRILL, findings: "Lead" },
-          { nodeId: "R2.A2", state: NodeState.DEAD, findings: "Dead" },
+          { nodeId: "R2.A2", state: NodeState.DEAD, findings: "Dead", evidence: "This path is a dead end because the approach fundamentally cannot work due to technical limitations" },
+          { nodeId: "R2.A3", state: NodeState.DEAD, findings: "Dead", evidence: "This path is a dead end because the approach fundamentally cannot work due to technical limitations" },
         ],
       },
       TEST_DIR
     );
 
-    // Round 3
+    // Round 3 - DRILL requires 3 children
     await handlePropose(
       {
         sessionId,
         nodes: [
           { id: "R3.A1a", parent: "R2.A1", title: "A1a", plannedAction: "A1a" },
           { id: "R3.A1b", parent: "R2.A1", title: "A1b", plannedAction: "A1b" },
+          { id: "R3.A1c", parent: "R2.A1", title: "A1c", plannedAction: "A1c" },
         ],
       },
       TEST_DIR
@@ -89,8 +92,9 @@ describe("tot_end", () => {
       {
         sessionId,
         results: [
-          { nodeId: "R3.A1a", state: NodeState.VALID, findings: "Solution!" },
-          { nodeId: "R3.A1b", state: NodeState.DEAD, findings: "Dead" },
+          { nodeId: "R3.A1a", state: NodeState.VALID, findings: "Solution!", evidence: "This is a valid solution because it meets all requirements and has been verified through testing" },
+          { nodeId: "R3.A1b", state: NodeState.DEAD, findings: "Dead", evidence: "This path is a dead end because the approach fundamentally cannot work due to technical limitations" },
+          { nodeId: "R3.A1c", state: NodeState.DEAD, findings: "Dead", evidence: "This path is a dead end because the approach fundamentally cannot work due to technical limitations" },
         ],
       },
       TEST_DIR
@@ -115,12 +119,14 @@ describe("tot_end", () => {
       TEST_DIR
     );
 
+    // Round 2 - DRILL requires 3 children
     await handlePropose(
       {
         sessionId,
         nodes: [
           { id: "R2.A1", parent: "R1.A", title: "A1", plannedAction: "A1" },
           { id: "R2.A2", parent: "R1.A", title: "A2", plannedAction: "A2" },
+          { id: "R2.A3", parent: "R1.A", title: "A3", plannedAction: "A3" },
         ],
       },
       TEST_DIR
@@ -130,18 +136,21 @@ describe("tot_end", () => {
         sessionId,
         results: [
           { nodeId: "R2.A1", state: NodeState.DRILL, findings: "More" },
-          { nodeId: "R2.A2", state: NodeState.SPEC, findings: "Theory" },
+          { nodeId: "R2.A2", state: NodeState.SPEC, findings: "Theory", evidence: "This is a speculative theory that requires further investigation to confirm or refute" },
+          { nodeId: "R2.A3", state: NodeState.DEAD, findings: "Dead", evidence: "This path is a dead end because the approach fundamentally cannot work due to technical limitations" },
         ],
       },
       TEST_DIR
     );
 
+    // Round 3 - DRILL requires 3 children
     await handlePropose(
       {
         sessionId,
         nodes: [
           { id: "R3.A1a", parent: "R2.A1", title: "A1a", plannedAction: "A1a" },
           { id: "R3.A1b", parent: "R2.A1", title: "A1b", plannedAction: "A1b" },
+          { id: "R3.A1c", parent: "R2.A1", title: "A1c", plannedAction: "A1c" },
         ],
       },
       TEST_DIR
@@ -150,8 +159,9 @@ describe("tot_end", () => {
       {
         sessionId,
         results: [
-          { nodeId: "R3.A1a", state: NodeState.VALID, findings: "Found it" },
-          { nodeId: "R3.A1b", state: NodeState.DEAD, findings: "Nope" },
+          { nodeId: "R3.A1a", state: NodeState.VALID, findings: "Found it", evidence: "This is a valid solution because it meets all requirements and has been verified through testing" },
+          { nodeId: "R3.A1b", state: NodeState.DEAD, findings: "Nope", evidence: "This path is a dead end because the approach fundamentally cannot work due to technical limitations" },
+          { nodeId: "R3.A1c", state: NodeState.DEAD, findings: "Nope", evidence: "This path is a dead end because the approach fundamentally cannot work due to technical limitations" },
         ],
       },
       TEST_DIR

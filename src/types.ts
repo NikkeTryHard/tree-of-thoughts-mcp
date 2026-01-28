@@ -3,6 +3,7 @@ export enum NodeState {
   VERIFY = "VERIFY",
   DEAD = "DEAD",
   VALID = "VALID",
+  VALID_PENDING = "VALID_PENDING",
   SPEC = "SPEC",
 }
 
@@ -11,6 +12,7 @@ export const STATE_COLORS: Record<NodeState, string> = {
   [NodeState.VERIFY]: "purple",
   [NodeState.DEAD]: "red",
   [NodeState.VALID]: "green",
+  [NodeState.VALID_PENDING]: "lightgreen",
   [NodeState.SPEC]: "gold",
 };
 
@@ -18,12 +20,18 @@ export function isTerminalState(state: NodeState): boolean {
   return [NodeState.DEAD, NodeState.VALID, NodeState.SPEC].includes(state);
 }
 
+export function isPendingState(state: NodeState): boolean {
+  return state === NodeState.VALID_PENDING;
+}
+
 export function getRequiredChildren(state: NodeState): number {
   switch (state) {
     case NodeState.DRILL:
-      return 2;
+      return 3; // Increased from 2
     case NodeState.VERIFY:
       return 1;
+    case NodeState.VALID_PENDING:
+      return 1; // Needs confirmation child
     default:
       return 0;
   }
@@ -37,6 +45,9 @@ export interface ToTNode {
   findings: string | null;
   children: string[];
   round: number;
+  evidence?: string;
+  verificationMethod?: string;
+  alternativesConsidered?: string[];
 }
 
 export interface ProposedNode {

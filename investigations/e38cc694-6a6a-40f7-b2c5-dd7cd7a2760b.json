@@ -1,0 +1,42 @@
+{
+  "sessionId": "e38cc694-6a6a-40f7-b2c5-dd7cd7a2760b",
+  "query": "What are the lesser-known legal ways for F1 international students to make money in the US? Explore: on-campus employment edge cases, CPT/OPT strategies, passive income that doesn't count as \"employment\", scholarships/fellowships, entrepreneurship options, and any gray areas that are technically permitted under immigration law.",
+  "minRoots": 5,
+  "currentRound": 1,
+  "currentBatch": 0,
+  "nodes": {},
+  "pendingProposals": {
+    "R1.A": {
+      "id": "R1.A",
+      "parent": null,
+      "title": "On-Campus Employment Edge Cases",
+      "plannedAction": "Research lesser-known on-campus employment options: bookstores, cafeterias run by third-party vendors on campus, research assistantships, university-affiliated entities, and how 'on-campus' is legally defined"
+    },
+    "R1.B": {
+      "id": "R1.B",
+      "parent": null,
+      "title": "Passive Income Loopholes",
+      "plannedAction": "Investigate income sources that don't count as 'employment' under immigration law: stock trading, crypto, royalties, rental income from home country assets, online content monetization, selling personal property"
+    },
+    "R1.C": {
+      "id": "R1.C",
+      "parent": null,
+      "title": "CPT/OPT Optimization",
+      "plannedAction": "Research strategies to maximize CPT usage, Day-1 CPT programs, pre-completion OPT, stacking OPT with degree changes, STEM OPT extension eligibility tricks"
+    },
+    "R1.D": {
+      "id": "R1.D",
+      "parent": null,
+      "title": "Entrepreneurship Gray Areas",
+      "plannedAction": "Explore what F1 students CAN do: unpaid ownership, passive investment, forming LLCs for passive income, freelancing through foreign entities, the 'active vs passive' distinction"
+    },
+    "R1.E": {
+      "id": "R1.E",
+      "parent": null,
+      "title": "Scholarships & Prize Money",
+      "plannedAction": "Research fellowship stipends, competition prize money, research grants paid directly to students, teaching assistantships with tuition waivers - income that bypasses work authorization"
+    }
+  },
+  "createdAt": "2026-01-28T03:31:34.177Z",
+  "updatedAt": "2026-01-28T03:31:46.211Z"
+}

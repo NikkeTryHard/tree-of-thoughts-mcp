@@ -33,8 +33,8 @@ describe("tot_reclassify", () => {
       {
         sessionId,
         results: [
-          { nodeId: "R1.A", state: NodeState.DEAD, findings: "Dead" },
-          { nodeId: "R1.B", state: NodeState.VALID, findings: "Valid" },
+          { nodeId: "R1.A", state: NodeState.DEAD, findings: "Dead", evidence: "This path is a dead end because the approach fundamentally cannot work due to technical limitations" },
+          { nodeId: "R1.B", state: NodeState.VALID, findings: "Valid", evidence: "This is a valid solution because it meets all requirements and has been verified through testing" },
         ],
       },
       TEST_DIR
@@ -80,7 +80,7 @@ describe("tot_reclassify", () => {
     await handleCommit(
       {
         sessionId,
-        results: [{ nodeId: "R2.A1", state: NodeState.DEAD, findings: "Dead" }],
+        results: [{ nodeId: "R2.A1", state: NodeState.DEAD, findings: "Dead", evidence: "This path is a dead end because the approach fundamentally cannot work due to technical limitations" }],
       },
       TEST_DIR
     );
