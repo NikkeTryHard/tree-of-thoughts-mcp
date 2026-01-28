@@ -43,8 +43,9 @@ export class DotGenerator {
     lines.push('    label="States";');
     lines.push("    node [width=2];");
     lines.push(`    L_EXPLORE [label="EXPLORE\\nSpawn >= 2", fillcolor=${STATE_COLORS[NodeState.EXPLORE]}];`);
+    lines.push(`    L_FOUND [label="FOUND\\nNeeds VERIFY", fillcolor=${STATE_COLORS[NodeState.FOUND]}];`);
+    lines.push(`    L_VERIFY [label="VERIFY\\nConfirmed", fillcolor=${STATE_COLORS[NodeState.VERIFY]}];`);
     lines.push(`    L_DEAD [label="DEAD\\nStop", fillcolor=${STATE_COLORS[NodeState.DEAD]}];`);
-    lines.push(`    L_FOUND [label="FOUND\\nSolution", fillcolor=${STATE_COLORS[NodeState.FOUND]}];`);
     lines.push("  }");
     lines.push("}");
 
