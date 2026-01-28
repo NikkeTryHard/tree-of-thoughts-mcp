@@ -144,7 +144,8 @@ export async function handleCommit(
   state.save();
 
   const dot = DotGenerator.generate(state);
-  const totalBatches = Math.ceil(nodesRequired / 5);
+  const MAX_BATCH_SIZE = 5;
+  const totalBatches = Math.ceil(nodesRequired / MAX_BATCH_SIZE);
 
   return {
     status: "OK",
@@ -154,7 +155,7 @@ export async function handleCommit(
     batchComplete: true,
     roundComplete,
     nextRoundInfo: {
-      round: roundComplete ? state.data.currentRound : state.data.currentRound,
+      round: state.data.currentRound,
       nodesRequired,
       totalBatches,
       parentBreakdown,
