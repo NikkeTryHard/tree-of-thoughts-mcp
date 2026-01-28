@@ -14,6 +14,7 @@ export const commitInputSchema = z.object({
         nodeId: z.string().describe("The node ID that was executed"),
         state: z.nativeEnum(NodeState).describe("EXPLORE=dig deeper, FOUND=provisional (R3+, needs VERIFY), VERIFY=confirms FOUND, DEAD=dead end"),
         findings: z.string().describe("What the agent discovered"),
+        agentId: z.string().optional().describe("The Task agent ID that performed the research"),
       }),
     )
     .describe("Results from executed agents"),
@@ -89,6 +90,13 @@ export async function handleCommit(input: CommitInput, persistDir: string = "./i
       if (elapsed < MIN_RESEARCH_TIME_MS) {
         warnings.push(`SUSPICIOUS: ${result.nodeId} committed ${Math.round(elapsed / 1000)}s after propose (min ${MIN_RESEARCH_TIME_MS / 1000}s). Was an agent actually spawned?`);
       }
+    }
+  }
+
+  // Anti-gaming: Check for missing agentId
+  for (const result of input.results) {
+    if (!result.agentId) {
+      warnings.push(`MISSING_AGENT: ${result.nodeId} has no agentId. Cannot verify research was performed.`);
     }
   }
 

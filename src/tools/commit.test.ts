@@ -34,6 +34,49 @@ describe("anti-gaming: timing", () => {
   });
 });
 
+describe("anti-gaming: agentId", () => {
+  beforeEach(() => {
+    mkdirSync(TEST_DIR, { recursive: true });
+  });
+
+  afterEach(() => {
+    rmSync(TEST_DIR, { recursive: true, force: true });
+  });
+
+  it("warns MISSING_AGENT if no agentId provided", async () => {
+    const start = await handleStart({ query: "Test" }, TEST_DIR);
+
+    await handlePropose({
+      sessionId: start.sessionId,
+      nodes: [{ id: "R1.A", parent: null, title: "Test", plannedAction: "Test" }],
+    }, TEST_DIR);
+
+    // Commit without agentId
+    const result = await handleCommit({
+      sessionId: start.sessionId,
+      results: [{ nodeId: "R1.A", state: NodeState.EXPLORE, findings: "Test" }],
+    }, TEST_DIR);
+
+    expect(result.warnings.some(w => w.includes("MISSING_AGENT"))).toBe(true);
+  });
+
+  it("no warning if agentId provided", async () => {
+    const start = await handleStart({ query: "Test" }, TEST_DIR);
+
+    await handlePropose({
+      sessionId: start.sessionId,
+      nodes: [{ id: "R1.A", parent: null, title: "Test", plannedAction: "Test" }],
+    }, TEST_DIR);
+
+    const result = await handleCommit({
+      sessionId: start.sessionId,
+      results: [{ nodeId: "R1.A", state: NodeState.EXPLORE, findings: "Test", agentId: "agent-123" }],
+    }, TEST_DIR);
+
+    expect(result.warnings.some(w => w.includes("MISSING_AGENT"))).toBe(false);
+  });
+});
+
 describe("depth enforcement", () => {
   beforeEach(() => {
     mkdirSync(TEST_DIR, { recursive: true });

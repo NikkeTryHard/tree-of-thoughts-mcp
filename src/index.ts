@@ -63,6 +63,7 @@ server.tool(
           nodeId: z.string().describe("Node ID"),
           state: z.enum(["EXPLORE", "DEAD", "FOUND", "VERIFY"]).describe("EXPLORE=dig deeper (2+ children), FOUND=provisional solution (1+ VERIFY child, R4+ only), VERIFY=confirms FOUND, DEAD=dead end"),
           findings: z.string().describe("What was discovered"),
+          agentId: z.string().optional().describe("Task agent ID that performed research"),
         }),
       )
       .describe("Results from agents"),
@@ -72,6 +73,7 @@ server.tool(
       nodeId: r.nodeId,
       state: r.state as NodeState,
       findings: r.findings,
+      agentId: r.agentId,
     }));
     const result = await handleCommit({ sessionId: input.sessionId, results }, PERSIST_DIR);
     return {
