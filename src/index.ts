@@ -11,7 +11,7 @@ import {
   handleEnd,
 } from "./tools";
 
-const PERSIST_DIR = "./investigations";
+const PERSIST_DIR = process.env.TOT_PERSIST_DIR || "./investigations";
 
 const server = new McpServer({
   name: "tree-of-thoughts",

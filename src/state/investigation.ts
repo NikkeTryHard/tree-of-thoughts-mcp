@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from "uuid";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
-import type { Investigation, ToTNode } from "../types";
+import type { Investigation, ToTNode, ProposedNode } from "../types";
 
 export class InvestigationState {
   public data: Investigation;
@@ -25,7 +25,7 @@ export class InvestigationState {
       currentRound: 1,
       currentBatch: 0,
       nodes: {},
-      queue: [],
+      pendingProposals: {},
       createdAt: now,
       updatedAt: now,
     };
@@ -40,9 +40,17 @@ export class InvestigationState {
     if (!existsSync(filePath)) {
       return null;
     }
-    const content = readFileSync(filePath, "utf-8");
-    const data = JSON.parse(content) as Investigation;
-    return new InvestigationState(data, persistDir);
+    try {
+      const content = readFileSync(filePath, "utf-8");
+      const data = JSON.parse(content) as Investigation;
+      // Migration: ensure pendingProposals exists for older files
+      if (!data.pendingProposals) {
+        data.pendingProposals = {};
+      }
+      return new InvestigationState(data, persistDir);
+    } catch {
+      return null;
+    }
   }
 
   save(): void {
@@ -83,5 +91,28 @@ export class InvestigationState {
 
   getAllNodes(): ToTNode[] {
     return Object.values(this.data.nodes);
+  }
+
+  // Pending proposals management
+  addPendingProposals(proposals: ProposedNode[]): void {
+    for (const proposal of proposals) {
+      this.data.pendingProposals[proposal.id] = proposal;
+    }
+  }
+
+  getPendingProposal(id: string): ProposedNode | null {
+    return this.data.pendingProposals[id] ?? null;
+  }
+
+  removePendingProposal(id: string): void {
+    delete this.data.pendingProposals[id];
+  }
+
+  clearPendingProposals(): void {
+    this.data.pendingProposals = {};
+  }
+
+  getPendingProposalCount(): number {
+    return Object.keys(this.data.pendingProposals).length;
   }
 }

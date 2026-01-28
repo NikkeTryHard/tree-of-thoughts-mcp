@@ -32,7 +32,7 @@ describe("tot_start", () => {
 
   test("uses default minRoots of 5", async () => {
     const result = await handleStart(
-      { query: "Test", minRoots: 5 },
+      { query: "Test" } as any,
       TEST_DIR
     );
 

@@ -59,7 +59,7 @@ export interface Investigation {
   currentRound: number;
   currentBatch: number;
   nodes: Record<string, ToTNode>;
-  queue: string[];
+  pendingProposals: Record<string, ProposedNode>;
   createdAt: string;
   updatedAt: string;
 }

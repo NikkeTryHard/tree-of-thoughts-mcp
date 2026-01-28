@@ -74,6 +74,10 @@ export async function handlePropose(
     };
   }
 
+  // Store pending proposals for later validation during commit
+  state.addPendingProposals(proposed);
+  state.save();
+
   return {
     status: "OK",
     errors: [],

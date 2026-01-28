@@ -66,14 +66,20 @@ describe("tot_status", () => {
     await handlePropose(
       {
         sessionId,
-        nodes: [{ id: "R1.A", parent: null, title: "A", plannedAction: "A" }],
+        nodes: [
+          { id: "R1.A", parent: null, title: "A", plannedAction: "A" },
+          { id: "R1.B", parent: null, title: "B", plannedAction: "B" },
+        ],
       },
       TEST_DIR
     );
     await handleCommit(
       {
         sessionId,
-        results: [{ nodeId: "R1.A", state: NodeState.DRILL, findings: "Lead" }],
+        results: [
+          { nodeId: "R1.A", state: NodeState.DRILL, findings: "Lead" },
+          { nodeId: "R1.B", state: NodeState.DEAD, findings: "Dead" },
+        ],
       },
       TEST_DIR
     );

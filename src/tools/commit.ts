@@ -61,38 +61,52 @@ export async function handleCommit(
 
   const errors: ValidationError[] = [];
 
-  // Add nodes to state
+  // Validate that all committed nodes were proposed
   for (const result of input.results) {
+    const proposal = state.getPendingProposal(result.nodeId);
+    if (!proposal) {
+      errors.push({
+        nodeId: result.nodeId,
+        error: "NOT_PROPOSED",
+        message: `Node ${result.nodeId} was not proposed. Call tot_propose first.`,
+        suggestion: "Ensure all nodes are proposed before committing",
+      });
+    }
+  }
+
+  if (errors.length > 0) {
+    return {
+      status: "REJECTED",
+      errors,
+      dot: "",
+      currentRound: state.data.currentRound,
+      batchComplete: false,
+      roundComplete: false,
+      nextRoundInfo: { round: 0, nodesRequired: 0, totalBatches: 0, parentBreakdown: [] },
+      message: `Commit rejected: ${errors.length} node(s) were not proposed`,
+    };
+  }
+
+  // Add nodes to state using proposal data
+  for (const result of input.results) {
+    const proposal = state.getPendingProposal(result.nodeId)!;
+
     // Extract round from ID
     const roundMatch = result.nodeId.match(/^R(\d+)\./);
     const round = roundMatch ? parseInt(roundMatch[1], 10) : state.data.currentRound;
 
-    // Determine parent from ID pattern
-    let parent: string | null = null;
-    if (round > 1) {
-      // Extract parent ID from hierarchical naming
-      // R2.A1 -> parent is R1.A
-      // R3.A1a -> parent is R2.A1
-      const idParts = result.nodeId.split(".");
-      if (idParts.length === 2) {
-        const suffix = idParts[1];
-        // Remove last character(s) to get parent suffix
-        const parentSuffix = suffix.slice(0, -1);
-        if (parentSuffix.length > 0) {
-          parent = `R${round - 1}.${parentSuffix}`;
-        }
-      }
-    }
-
     state.addNode({
       id: result.nodeId,
-      parent,
+      parent: proposal.parent,
       state: result.state,
-      title: result.nodeId, // Will be updated with actual title
+      title: proposal.title,
       findings: result.findings,
       children: [],
       round,
     });
+
+    // Remove from pending
+    state.removePendingProposal(result.nodeId);
   }
 
   // Calculate next round requirements

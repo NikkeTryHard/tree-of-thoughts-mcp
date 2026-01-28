@@ -173,10 +173,10 @@ export class Validator {
       };
     }
 
-    if (state.data.queue.length > 0) {
+    if (state.getPendingProposalCount() > 0) {
       return {
         canEnd: false,
-        reason: `Queue still has ${state.data.queue.length} pending nodes`,
+        reason: `${state.getPendingProposalCount()} pending proposals not yet committed`,
       };
     }
 
