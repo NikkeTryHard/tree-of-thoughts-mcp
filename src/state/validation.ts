@@ -158,12 +158,18 @@ export class Validator {
     }
 
     const allNodes = state.getAllNodes();
-    const nonTerminal = allNodes.filter((n) => !isTerminalState(n.state));
 
-    if (nonTerminal.length > 0) {
+    // A node is "unresolved" if it's non-terminal AND doesn't have enough children
+    const unresolvedNodes = allNodes.filter((n) => {
+      if (isTerminalState(n.state)) return false;
+      const required = getRequiredChildren(n.state);
+      return n.children.length < required;
+    });
+
+    if (unresolvedNodes.length > 0) {
       return {
         canEnd: false,
-        reason: `${nonTerminal.length} nodes still active: ${nonTerminal.map((n) => n.id).join(", ")}`,
+        reason: `${unresolvedNodes.length} nodes still need children: ${unresolvedNodes.map((n) => n.id).join(", ")}`,
       };
     }
 
