@@ -2,7 +2,34 @@ import { z } from "zod";
 import { InvestigationState } from "../state/investigation";
 import { Validator } from "../state/validation";
 import { DotGenerator } from "../state/dot-generator";
-import { NodeState } from "../types";
+import { NodeState, type ToTNode } from "../types";
+
+function extractReferences(nodes: ToTNode[]): string[] {
+  const refs: Set<string> = new Set();
+  const urlPattern = /https?:\/\/[^\s\)]+/g;
+  const pathPattern = /- ([a-zA-Z0-9_\-\.\/]+\.(ts|js|py|rs|go|md))/g;
+
+  for (const node of nodes) {
+    if (!node.findings) continue;
+
+    // Extract URLs
+    const urls = node.findings.match(urlPattern);
+    if (urls) urls.forEach((u) => refs.add(u));
+
+    // Extract file paths from References section
+    const refSection = node.findings.match(/## References\n([\s\S]*?)(?=\n##|$)/gi);
+    if (refSection) {
+      for (const section of refSection) {
+        let match;
+        while ((match = pathPattern.exec(section)) !== null) {
+          refs.add(match[1]);
+        }
+      }
+    }
+  }
+
+  return Array.from(refs);
+}
 
 export const endInputSchema = z.object({
   sessionId: z.string().describe("The investigation session ID"),
@@ -27,6 +54,7 @@ export interface EndResult {
   finalDot: string;
   solutions: NodeSummary[];
   deadEnds: number;
+  references: string[];
 }
 
 export async function handleEnd(input: EndInput, persistDir: string = "./investigations"): Promise<EndResult> {
@@ -43,6 +71,7 @@ export async function handleEnd(input: EndInput, persistDir: string = "./investi
       finalDot: "",
       solutions: [],
       deadEnds: 0,
+      references: [],
     };
   }
 
@@ -59,10 +88,12 @@ export async function handleEnd(input: EndInput, persistDir: string = "./investi
       finalDot: DotGenerator.generate(state),
       solutions: [],
       deadEnds: 0,
+      references: [],
     };
   }
 
   const allNodes = state.getAllNodes();
+  const references = extractReferences(allNodes);
 
   const solutions: NodeSummary[] = allNodes
     .filter((n) => n.state === NodeState.FOUND)
@@ -84,5 +115,6 @@ export async function handleEnd(input: EndInput, persistDir: string = "./investi
     finalDot: DotGenerator.generate(state),
     solutions,
     deadEnds,
+    references,
   };
 }
