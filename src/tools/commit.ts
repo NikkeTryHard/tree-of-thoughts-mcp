@@ -10,7 +10,7 @@ export const commitInputSchema = z.object({
     .array(
       z.object({
         nodeId: z.string().describe("The node ID that was executed"),
-        state: z.nativeEnum(NodeState).describe("The resulting state: EXPLORE, DEAD, or FOUND"),
+        state: z.nativeEnum(NodeState).describe("EXPLORE=dig deeper, FOUND=provisional (R3+, needs VERIFY), VERIFY=confirms FOUND, DEAD=dead end"),
         findings: z.string().describe("What the agent discovered"),
       }),
     )
