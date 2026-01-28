@@ -16,8 +16,8 @@ describe("depth enforcement", () => {
     rmSync(TEST_DIR, { recursive: true, force: true });
   });
 
-  it("converts FOUND to EXPLORE before round 3", async () => {
-    const startResult = await handleStart({ query: "test", minRoots: 1 }, TEST_DIR);
+  it("converts FOUND to EXPLORE before round 4", async () => {
+    const startResult = await handleStart({ query: "test" }, TEST_DIR);
     const sessionId = startResult.sessionId;
 
     await handlePropose(
@@ -45,13 +45,35 @@ describe("depth enforcement", () => {
       },
       TEST_DIR,
     );
+    await handleCommit(
+      {
+        sessionId,
+        results: [
+          { nodeId: "R2.A1", state: NodeState.EXPLORE, findings: "x" },
+          { nodeId: "R2.A2", state: NodeState.DEAD, findings: "x" },
+        ],
+      },
+      TEST_DIR,
+    );
+
+    // R3 - FOUND here should be converted to EXPLORE (before R4)
+    await handlePropose(
+      {
+        sessionId,
+        nodes: [
+          { id: "R3.A1a", parent: "R2.A1", title: "Child1", plannedAction: "test" },
+          { id: "R3.A1b", parent: "R2.A1", title: "Child2", plannedAction: "test" },
+        ],
+      },
+      TEST_DIR,
+    );
 
     const result = await handleCommit(
       {
         sessionId,
         results: [
-          { nodeId: "R2.A1", state: NodeState.FOUND, findings: "solution" },
-          { nodeId: "R2.A2", state: NodeState.DEAD, findings: "dead" },
+          { nodeId: "R3.A1a", state: NodeState.FOUND, findings: "solution" },
+          { nodeId: "R3.A1b", state: NodeState.DEAD, findings: "dead" },
         ],
       },
       TEST_DIR,
@@ -59,14 +81,14 @@ describe("depth enforcement", () => {
 
     expect(result.status).toBe("OK");
     expect(result.warnings.some((w) => w.includes("DEPTH_ENFORCED"))).toBe(true);
-    expect(result.pendingExplore).toContain("R2.A1");
+    expect(result.pendingExplore).toContain("R3.A1a");
   });
 
-  it("allows FOUND at round 3+", async () => {
-    const startResult = await handleStart({ query: "test", minRoots: 1 }, TEST_DIR);
+  it("allows FOUND at round 4+", async () => {
+    const startResult = await handleStart({ query: "test" }, TEST_DIR);
     const sessionId = startResult.sessionId;
 
-    // Build to R3
+    // Build to R4
     await handlePropose({ sessionId, nodes: [{ id: "R1.A", parent: null, title: "R1", plannedAction: "t" }] }, TEST_DIR);
     await handleCommit({ sessionId, results: [{ nodeId: "R1.A", state: NodeState.EXPLORE, findings: "x" }] }, TEST_DIR);
 
@@ -101,12 +123,34 @@ describe("depth enforcement", () => {
       },
       TEST_DIR,
     );
+    await handleCommit(
+      {
+        sessionId,
+        results: [
+          { nodeId: "R3.A1a", state: NodeState.EXPLORE, findings: "x" },
+          { nodeId: "R3.A1b", state: NodeState.DEAD, findings: "x" },
+        ],
+      },
+      TEST_DIR,
+    );
+
+    // R4 - FOUND should be allowed here
+    await handlePropose(
+      {
+        sessionId,
+        nodes: [
+          { id: "R4.A1a1", parent: "R3.A1a", title: "R4a", plannedAction: "t" },
+          { id: "R4.A1a2", parent: "R3.A1a", title: "R4b", plannedAction: "t" },
+        ],
+      },
+      TEST_DIR,
+    );
     const result = await handleCommit(
       {
         sessionId,
         results: [
-          { nodeId: "R3.A1a", state: NodeState.FOUND, findings: "solution" },
-          { nodeId: "R3.A1b", state: NodeState.DEAD, findings: "x" },
+          { nodeId: "R4.A1a1", state: NodeState.FOUND, findings: "solution" },
+          { nodeId: "R4.A1a2", state: NodeState.DEAD, findings: "x" },
         ],
       },
       TEST_DIR,
@@ -126,10 +170,10 @@ describe("FOUND requires VERIFY", () => {
   });
 
   it("FOUND node appears in pendingExplore until VERIFY child added", async () => {
-    const startResult = await handleStart({ query: "test", minRoots: 1 }, TEST_DIR);
+    const startResult = await handleStart({ query: "test" }, TEST_DIR);
     const sessionId = startResult.sessionId;
 
-    // Build to R3 FOUND
+    // Build to R4 FOUND
     await handlePropose({ sessionId, nodes: [{ id: "R1.A", parent: null, title: "R1", plannedAction: "t" }] }, TEST_DIR);
     await handleCommit({ sessionId, results: [{ nodeId: "R1.A", state: NodeState.EXPLORE, findings: "x" }] }, TEST_DIR);
 
@@ -164,26 +208,48 @@ describe("FOUND requires VERIFY", () => {
       },
       TEST_DIR,
     );
-    const result1 = await handleCommit(
+    await handleCommit(
       {
         sessionId,
         results: [
-          { nodeId: "R3.A1a", state: NodeState.FOUND, findings: "solution" },
+          { nodeId: "R3.A1a", state: NodeState.EXPLORE, findings: "x" },
           { nodeId: "R3.A1b", state: NodeState.DEAD, findings: "x" },
         ],
       },
       TEST_DIR,
     );
 
+    // R4 - FOUND is allowed here
+    await handlePropose(
+      {
+        sessionId,
+        nodes: [
+          { id: "R4.A1a1", parent: "R3.A1a", title: "R4a", plannedAction: "t" },
+          { id: "R4.A1a2", parent: "R3.A1a", title: "R4b", plannedAction: "t" },
+        ],
+      },
+      TEST_DIR,
+    );
+    const result1 = await handleCommit(
+      {
+        sessionId,
+        results: [
+          { nodeId: "R4.A1a1", state: NodeState.FOUND, findings: "solution" },
+          { nodeId: "R4.A1a2", state: NodeState.DEAD, findings: "x" },
+        ],
+      },
+      TEST_DIR,
+    );
+
     // FOUND should need VERIFY child
-    expect(result1.pendingExplore).toContain("R3.A1a");
+    expect(result1.pendingExplore).toContain("R4.A1a1");
     expect(result1.canEnd).toBe(false);
 
     // Add VERIFY child
-    await handlePropose({ sessionId, nodes: [{ id: "R4.A1a1", parent: "R3.A1a", title: "Verify", plannedAction: "verify" }] }, TEST_DIR);
-    const result2 = await handleCommit({ sessionId, results: [{ nodeId: "R4.A1a1", state: NodeState.VERIFY, findings: "confirmed" }] }, TEST_DIR);
+    await handlePropose({ sessionId, nodes: [{ id: "R5.A1a1a", parent: "R4.A1a1", title: "Verify", plannedAction: "verify" }] }, TEST_DIR);
+    const result2 = await handleCommit({ sessionId, results: [{ nodeId: "R5.A1a1a", state: NodeState.VERIFY, findings: "confirmed" }] }, TEST_DIR);
 
-    expect(result2.pendingExplore).not.toContain("R3.A1a");
+    expect(result2.pendingExplore).not.toContain("R4.A1a1");
     expect(result2.canEnd).toBe(true);
   });
 });

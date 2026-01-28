@@ -19,10 +19,10 @@ describe("references extraction", () => {
 
   it("extracts references from findings", async () => {
     // Setup complete investigation with references in findings
-    const startResult = await handleStart({ query: "test", minRoots: 1 }, TEST_DIR);
+    const startResult = await handleStart({ query: "test" }, TEST_DIR);
     const sessionId = startResult.sessionId;
 
-    // Build complete tree with VERIFY
+    // Build complete tree to R5 with VERIFY (min 5 rounds required)
     await handlePropose({ sessionId, nodes: [{ id: "R1.A", parent: null, title: "R1", plannedAction: "t" }] }, TEST_DIR);
     await handleCommit(
       {
@@ -73,15 +73,38 @@ describe("references extraction", () => {
       {
         sessionId,
         results: [
-          { nodeId: "R3.A1a", state: NodeState.FOUND, findings: "solution\n\n## References\n- https://docs.com" },
+          { nodeId: "R3.A1a", state: NodeState.EXPLORE, findings: "x" },
           { nodeId: "R3.A1b", state: NodeState.DEAD, findings: "x" },
         ],
       },
       TEST_DIR,
     );
 
-    await handlePropose({ sessionId, nodes: [{ id: "R4.A1a1", parent: "R3.A1a", title: "Verify", plannedAction: "verify" }] }, TEST_DIR);
-    await handleCommit({ sessionId, results: [{ nodeId: "R4.A1a1", state: NodeState.VERIFY, findings: "confirmed" }] }, TEST_DIR);
+    // R4 - FOUND allowed here
+    await handlePropose(
+      {
+        sessionId,
+        nodes: [
+          { id: "R4.A1a1", parent: "R3.A1a", title: "R4a", plannedAction: "t" },
+          { id: "R4.A1a2", parent: "R3.A1a", title: "R4b", plannedAction: "t" },
+        ],
+      },
+      TEST_DIR,
+    );
+    await handleCommit(
+      {
+        sessionId,
+        results: [
+          { nodeId: "R4.A1a1", state: NodeState.FOUND, findings: "solution\n\n## References\n- https://docs.com" },
+          { nodeId: "R4.A1a2", state: NodeState.DEAD, findings: "x" },
+        ],
+      },
+      TEST_DIR,
+    );
+
+    // R5 - VERIFY
+    await handlePropose({ sessionId, nodes: [{ id: "R5.A1a1a", parent: "R4.A1a1", title: "Verify", plannedAction: "verify" }] }, TEST_DIR);
+    await handleCommit({ sessionId, results: [{ nodeId: "R5.A1a1a", state: NodeState.VERIFY, findings: "confirmed" }] }, TEST_DIR);
 
     const result = await handleEnd({ sessionId }, TEST_DIR);
 
