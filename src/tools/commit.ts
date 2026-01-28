@@ -22,6 +22,7 @@ export type CommitInput = z.infer<typeof commitInputSchema>;
 export interface CommitResult {
   status: "OK" | "REJECTED";
   errors: ValidationError[];
+  warnings: string[];
   currentRound: number;
   canEnd: boolean;
   pendingExplore: string[];
@@ -41,12 +42,15 @@ export async function handleCommit(input: CommitInput, persistDir: string = "./i
           message: `Investigation ${input.sessionId} not found`,
         },
       ],
+      warnings: [],
       currentRound: 0,
       canEnd: false,
       pendingExplore: [],
       message: "Session not found",
     };
   }
+
+  const warnings: string[] = [];
 
   const errors: ValidationError[] = [];
 
@@ -67,6 +71,7 @@ export async function handleCommit(input: CommitInput, persistDir: string = "./i
     return {
       status: "REJECTED",
       errors,
+      warnings: [],
       currentRound: state.data.currentRound,
       canEnd: false,
       pendingExplore: [],
@@ -74,8 +79,21 @@ export async function handleCommit(input: CommitInput, persistDir: string = "./i
     };
   }
 
+  // Depth enforcement: FOUND only allowed at Round 3+
+  const MIN_DEPTH_FOR_FOUND = 3;
+  const processedResults = input.results.map((result) => {
+    const roundMatch = result.nodeId.match(/^R(\d+)\./);
+    const round = roundMatch ? parseInt(roundMatch[1], 10) : 1;
+
+    if (result.state === NodeState.FOUND && round < MIN_DEPTH_FOR_FOUND) {
+      warnings.push(`DEPTH_ENFORCED: ${result.nodeId} converted FOUND→EXPLORE (round ${round} < ${MIN_DEPTH_FOR_FOUND}). Add 2 children.`);
+      return { ...result, state: NodeState.EXPLORE };
+    }
+    return result;
+  });
+
   // Add nodes to state using proposal data
-  for (const result of input.results) {
+  for (const result of processedResults) {
     const proposal = state.getPendingProposal(result.nodeId)!;
 
     // Extract round from ID
@@ -121,6 +139,7 @@ export async function handleCommit(input: CommitInput, persistDir: string = "./i
   return {
     status: "OK",
     errors: [],
+    warnings,
     currentRound: state.data.currentRound,
     canEnd: canEndResult.canEnd,
     pendingExplore,
