@@ -55,14 +55,14 @@ server.tool(
 // tot_commit - Submit agent results
 server.tool(
   "tot_commit",
-  "Submit results. States: EXPLORE (needs 2+ children), DEAD, FOUND.",
+  "Submit results. States: EXPLORE (needs 2+ children), FOUND (needs 1+ VERIFY, R3+ only), VERIFY (confirms FOUND), DEAD.",
   {
     sessionId: z.string().describe("Session ID"),
     results: z
       .array(
         z.object({
           nodeId: z.string().describe("Node ID"),
-          state: z.enum(["EXPLORE", "DEAD", "FOUND"]).describe("EXPLORE=dig deeper, DEAD=dead end, FOUND=solution"),
+          state: z.enum(["EXPLORE", "DEAD", "FOUND", "VERIFY"]).describe("EXPLORE=dig deeper (2+ children), FOUND=provisional solution (1+ VERIFY child, R3+ only), VERIFY=confirms FOUND, DEAD=dead end"),
           findings: z.string().describe("What was discovered"),
         }),
       )
@@ -88,7 +88,7 @@ server.tool(
   {
     sessionId: z.string().describe("Session ID"),
     nodeId: z.string().describe("Node ID"),
-    newState: z.enum(["EXPLORE", "DEAD", "FOUND"]).describe("New state"),
+    newState: z.enum(["EXPLORE", "DEAD", "FOUND", "VERIFY"]).describe("New state"),
   },
   async (input) => {
     const result = await handleReclassify(
