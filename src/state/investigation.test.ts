@@ -88,4 +88,82 @@ describe("InvestigationState", () => {
     });
     expect(state.data.nodes["R1.A"].children).toContain("R2.A1");
   });
+
+  test("tracks nodes awaiting confirmation", () => {
+    const state = InvestigationState.create("Test", 5, TEST_DIR);
+
+    state.addNode({
+      id: "R3.A1",
+      parent: null,
+      state: NodeState.VALID_PENDING,
+      title: "Pending validation",
+      findings: "Found something",
+      children: [],
+      round: 3,
+    });
+
+    const pending = state.getNodesAwaitingConfirmation();
+    expect(pending).toHaveLength(1);
+    expect(pending[0].id).toBe("R3.A1");
+  });
+
+  test("confirms pending validation when child is VALID", () => {
+    const state = InvestigationState.create("Test", 5, TEST_DIR);
+
+    state.addNode({
+      id: "R3.A1",
+      parent: null,
+      state: NodeState.VALID_PENDING,
+      title: "Pending",
+      findings: "Found",
+      children: [],
+      round: 3,
+    });
+
+    // Add confirming child
+    state.addNode({
+      id: "R4.A1a",
+      parent: "R3.A1",
+      state: NodeState.VALID,
+      title: "Confirmed",
+      findings: "Verified",
+      children: [],
+      round: 4,
+    });
+
+    state.processConfirmations();
+
+    const node = state.getNode("R3.A1");
+    expect(node?.state).toBe(NodeState.VALID);
+  });
+
+  test("reverts pending validation when child is DEAD", () => {
+    const state = InvestigationState.create("Test", 5, TEST_DIR);
+
+    state.addNode({
+      id: "R3.A1",
+      parent: null,
+      state: NodeState.VALID_PENDING,
+      title: "Pending",
+      findings: "Found",
+      children: [],
+      round: 3,
+    });
+
+    // Add rejecting child
+    state.addNode({
+      id: "R4.A1a",
+      parent: "R3.A1",
+      state: NodeState.DEAD,
+      title: "Rejected",
+      findings: "Actually not valid",
+      children: [],
+      round: 4,
+    });
+
+    state.processConfirmations();
+
+    const node = state.getNode("R3.A1");
+    expect(node?.state).toBe(NodeState.DRILL); // Reverted to DRILL for more exploration
+  });
 });

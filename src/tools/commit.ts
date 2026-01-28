@@ -167,6 +167,9 @@ export async function handleCommit(
     state.data.currentBatch = 0;
   }
 
+  // Process any pending confirmations (VALID_PENDING -> VALID or DRILL)
+  state.processConfirmations();
+
   state.save();
 
   const dot = DotGenerator.generate(state);
