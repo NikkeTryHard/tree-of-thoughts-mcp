@@ -1,40 +1,21 @@
 export enum NodeState {
-  DRILL = "DRILL",
-  VERIFY = "VERIFY",
-  DEAD = "DEAD",
-  VALID = "VALID",
-  VALID_PENDING = "VALID_PENDING",
-  SPEC = "SPEC",
+  EXPLORE = "EXPLORE", // Needs 2+ children to investigate further
+  DEAD = "DEAD", // Dead end, no more exploration needed
+  FOUND = "FOUND", // Solution/answer discovered
 }
 
 export const STATE_COLORS: Record<NodeState, string> = {
-  [NodeState.DRILL]: "lightblue",
-  [NodeState.VERIFY]: "purple",
+  [NodeState.EXPLORE]: "lightblue",
   [NodeState.DEAD]: "red",
-  [NodeState.VALID]: "green",
-  [NodeState.VALID_PENDING]: "lightgreen",
-  [NodeState.SPEC]: "gold",
+  [NodeState.FOUND]: "green",
 };
 
 export function isTerminalState(state: NodeState): boolean {
-  return [NodeState.DEAD, NodeState.VALID, NodeState.SPEC].includes(state);
-}
-
-export function isPendingState(state: NodeState): boolean {
-  return state === NodeState.VALID_PENDING;
+  return state === NodeState.DEAD || state === NodeState.FOUND;
 }
 
 export function getRequiredChildren(state: NodeState): number {
-  switch (state) {
-    case NodeState.DRILL:
-      return 3; // Increased from 2
-    case NodeState.VERIFY:
-      return 1;
-    case NodeState.VALID_PENDING:
-      return 1; // Needs confirmation child
-    default:
-      return 0;
-  }
+  return state === NodeState.EXPLORE ? 2 : 0;
 }
 
 export interface ToTNode {
@@ -45,9 +26,6 @@ export interface ToTNode {
   findings: string | null;
   children: string[];
   round: number;
-  evidence?: string;
-  verificationMethod?: string;
-  alternativesConsidered?: string[];
 }
 
 export interface ProposedNode {
@@ -86,10 +64,8 @@ export interface BatchStatus {
   sessionId: string;
   currentRound: number;
   currentBatch: number;
-  totalBatchesInRound: number;
   nodesInQueue: number;
-  activeDrills: number;
-  activeVerifies: number;
+  activeExplore: number;
   terminalNodes: number;
   canEnd: boolean;
   dot: string;

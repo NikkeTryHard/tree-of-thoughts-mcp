@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from "uuid";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
-import { NodeState, type Investigation, type ToTNode, type ProposedNode } from "../types";
+import { type Investigation, type ToTNode, type ProposedNode } from "../types";
 
 export class InvestigationState {
   public data: Investigation;
@@ -12,11 +12,7 @@ export class InvestigationState {
     this.persistDir = persistDir;
   }
 
-  static create(
-    query: string,
-    minRoots: number = 5,
-    persistDir: string = "./investigations"
-  ): InvestigationState {
+  static create(query: string, minRoots: number = 3, persistDir: string = "./investigations"): InvestigationState {
     const now = new Date().toISOString();
     const data: Investigation = {
       sessionId: uuidv4(),
@@ -32,10 +28,7 @@ export class InvestigationState {
     return new InvestigationState(data, persistDir);
   }
 
-  static load(
-    sessionId: string,
-    persistDir: string = "./investigations"
-  ): InvestigationState | null {
+  static load(sessionId: string, persistDir: string = "./investigations"): InvestigationState | null {
     const filePath = join(persistDir, `${sessionId}.json`);
     if (!existsSync(filePath)) {
       return null;
@@ -43,7 +36,6 @@ export class InvestigationState {
     try {
       const content = readFileSync(filePath, "utf-8");
       const data = JSON.parse(content) as Investigation;
-      // Migration: ensure pendingProposals exists for older files
       if (!data.pendingProposals) {
         data.pendingProposals = {};
       }
@@ -93,7 +85,6 @@ export class InvestigationState {
     return Object.values(this.data.nodes);
   }
 
-  // Pending proposals management
   addPendingProposals(proposals: ProposedNode[]): void {
     for (const proposal of proposals) {
       this.data.pendingProposals[proposal.id] = proposal;
@@ -114,32 +105,5 @@ export class InvestigationState {
 
   getPendingProposalCount(): number {
     return Object.keys(this.data.pendingProposals).length;
-  }
-
-  getNodesAwaitingConfirmation(): ToTNode[] {
-    return Object.values(this.data.nodes).filter(
-      (n) => n.state === NodeState.VALID_PENDING
-    );
-  }
-
-  processConfirmations(): void {
-    const pendingNodes = this.getNodesAwaitingConfirmation();
-
-    for (const pending of pendingNodes) {
-      if (pending.children.length === 0) continue;
-
-      // Check first confirmation child
-      const confirmChild = this.getNode(pending.children[0]);
-      if (!confirmChild) continue;
-
-      if (confirmChild.state === NodeState.VALID) {
-        // Confirmed - upgrade to VALID
-        this.updateNode(pending.id, { state: NodeState.VALID });
-      } else if (confirmChild.state === NodeState.DEAD) {
-        // Rejected - revert to DRILL for more exploration
-        this.updateNode(pending.id, { state: NodeState.DRILL });
-      }
-      // If child is DRILL/VERIFY, wait for it to resolve
-    }
   }
 }

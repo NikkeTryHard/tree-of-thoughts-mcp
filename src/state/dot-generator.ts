@@ -10,10 +10,7 @@ export class DotGenerator {
     lines.push('  node [shape=box, style="filled,rounded", fontname="Arial"];');
     lines.push("");
 
-    const maxRound = Math.max(
-      0,
-      ...Object.values(state.data.nodes).map((n) => n.round)
-    );
+    const maxRound = Math.max(0, ...Object.values(state.data.nodes).map((n) => n.round));
 
     for (let round = 1; round <= maxRound; round++) {
       const nodesInRound = state.getNodesByRound(round);
@@ -24,13 +21,9 @@ export class DotGenerator {
       for (const node of nodesInRound) {
         const sanitizedId = this.sanitizeId(node.id);
         const color = STATE_COLORS[node.state];
-        const label = this.escapeLabel(
-          `R${node.round} | ${node.title}\\n(${node.state})`
-        );
+        const label = this.escapeLabel(`R${node.round} | ${node.title}\\n(${node.state})`);
 
-        lines.push(
-          `  ${sanitizedId} [fillcolor=${color}, label="${label}"];`
-        );
+        lines.push(`  ${sanitizedId} [fillcolor=${color}, label="${label}"];`);
       }
       lines.push("");
     }
@@ -47,23 +40,11 @@ export class DotGenerator {
 
     lines.push("  // --- Legend ---");
     lines.push("  subgraph cluster_legend {");
-    lines.push('    label="Taxonomy";');
+    lines.push('    label="States";');
     lines.push("    node [width=2];");
-    lines.push(
-      `    L_DRILL [label="DRILL (Lead)\\nSpawn >= 2", fillcolor=${STATE_COLORS[NodeState.DRILL]}];`
-    );
-    lines.push(
-      `    L_VERIFY [label="VERIFY (Ambiguous)\\nSpawn >= 1", fillcolor=${STATE_COLORS[NodeState.VERIFY]}];`
-    );
-    lines.push(
-      `    L_DEAD [label="DEAD (Pruned)\\nStop", fillcolor=${STATE_COLORS[NodeState.DEAD]}];`
-    );
-    lines.push(
-      `    L_VALID [label="VALID (Solution)\\nStop", fillcolor=${STATE_COLORS[NodeState.VALID]}];`
-    );
-    lines.push(
-      `    L_SPEC [label="SPEC (Theory)\\nStop", fillcolor=${STATE_COLORS[NodeState.SPEC]}];`
-    );
+    lines.push(`    L_EXPLORE [label="EXPLORE\\nSpawn >= 2", fillcolor=${STATE_COLORS[NodeState.EXPLORE]}];`);
+    lines.push(`    L_DEAD [label="DEAD\\nStop", fillcolor=${STATE_COLORS[NodeState.DEAD]}];`);
+    lines.push(`    L_FOUND [label="FOUND\\nSolution", fillcolor=${STATE_COLORS[NodeState.FOUND]}];`);
     lines.push("  }");
     lines.push("}");
 
@@ -75,9 +56,6 @@ export class DotGenerator {
   }
 
   private static escapeLabel(label: string): string {
-    return label
-      .replace(/"/g, '\\"')
-      .replace(/</g, "\\<")
-      .replace(/>/g, "\\>");
+    return label.replace(/"/g, '\\"').replace(/</g, "\\<").replace(/>/g, "\\>");
   }
 }

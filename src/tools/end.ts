@@ -26,14 +26,10 @@ export interface EndResult {
   totalNodes: number;
   finalDot: string;
   solutions: NodeSummary[];
-  theories: NodeSummary[];
   deadEnds: number;
 }
 
-export async function handleEnd(
-  input: EndInput,
-  persistDir: string = "./investigations"
-): Promise<EndResult> {
+export async function handleEnd(input: EndInput, persistDir: string = "./investigations"): Promise<EndResult> {
   const state = InvestigationState.load(input.sessionId, persistDir);
 
   if (!state) {
@@ -46,7 +42,6 @@ export async function handleEnd(
       totalNodes: 0,
       finalDot: "",
       solutions: [],
-      theories: [],
       deadEnds: 0,
     };
   }
@@ -63,7 +58,6 @@ export async function handleEnd(
       totalNodes: state.getAllNodes().length,
       finalDot: DotGenerator.generate(state),
       solutions: [],
-      theories: [],
       deadEnds: 0,
     };
   }
@@ -71,16 +65,7 @@ export async function handleEnd(
   const allNodes = state.getAllNodes();
 
   const solutions: NodeSummary[] = allNodes
-    .filter((n) => n.state === NodeState.VALID)
-    .map((n) => ({
-      nodeId: n.id,
-      title: n.title,
-      findings: n.findings || "",
-      round: n.round,
-    }));
-
-  const theories: NodeSummary[] = allNodes
-    .filter((n) => n.state === NodeState.SPEC)
+    .filter((n) => n.state === NodeState.FOUND)
     .map((n) => ({
       nodeId: n.id,
       title: n.title,
@@ -98,7 +83,6 @@ export async function handleEnd(
     totalNodes: allNodes.length,
     finalDot: DotGenerator.generate(state),
     solutions,
-    theories,
     deadEnds,
   };
 }

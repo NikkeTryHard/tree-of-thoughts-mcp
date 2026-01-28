@@ -2,91 +2,71 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { NodeState } from "./types";
-import {
-  handleStart,
-  handlePropose,
-  handleCommit,
-  handleReclassify,
-  handleStatus,
-  handleEnd,
-} from "./tools";
+import { handleStart, handlePropose, handleCommit, handleReclassify, handleStatus, handleEnd } from "./tools";
 
 const PERSIST_DIR = process.env.TOT_PERSIST_DIR || "./investigations";
 
 const server = new McpServer({
   name: "tree-of-thoughts",
-  version: "1.0.0",
+  version: "2.0.0",
 });
 
 // tot_start - Begin investigation
 server.tool(
   "tot_start",
-  "Start a new Tree of Thoughts investigation. Returns session ID and instructions.",
+  "Start investigation. Returns sessionId.",
   {
-    query: z.string().describe("The problem/question to investigate"),
-    minRoots: z
-      .number()
-      .min(1)
-      .optional()
-      .describe("Minimum root nodes in Round 1 (default: 5)"),
+    query: z.string().describe("The problem to investigate"),
+    minRoots: z.number().min(1).optional().describe("Min root nodes (default: 3)"),
   },
   async (input) => {
-    const result = await handleStart(
-      { query: input.query, minRoots: input.minRoots ?? 5 },
-      PERSIST_DIR
-    );
+    const result = await handleStart({ query: input.query, minRoots: input.minRoots ?? 3 }, PERSIST_DIR);
     return {
       content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
     };
-  }
+  },
 );
 
 // tot_propose - Validate batch before execution
 server.tool(
   "tot_propose",
-  "Validate a batch of nodes before spawning agents. Returns OK or REJECTED with errors.",
+  "Propose nodes (max 5). Returns OK or REJECTED.",
   {
-    sessionId: z.string().describe("The investigation session ID"),
+    sessionId: z.string().describe("Session ID"),
     nodes: z
       .array(
         z.object({
-          id: z.string().describe("Node ID (format: R[round].[id])"),
-          parent: z.string().nullable().describe("Parent node ID or null"),
-          title: z.string().describe("Short title for this node"),
-          plannedAction: z.string().describe("What the agent will do"),
-        })
+          id: z.string().describe("Node ID: R[round].[id] (e.g., R1.A, R2.A1)"),
+          parent: z.string().nullable().describe("Parent ID or null for roots"),
+          title: z.string().describe("Short title"),
+          plannedAction: z.string().describe("What to investigate"),
+        }),
       )
       .describe("Nodes to propose (max 5)"),
   },
   async (input) => {
-    const result = await handlePropose(
-      {
-        sessionId: input.sessionId,
-        nodes: input.nodes,
-      },
-      PERSIST_DIR
-    );
+    const result = await handlePropose({ sessionId: input.sessionId, nodes: input.nodes }, PERSIST_DIR);
     return {
       content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
     };
-  }
+  },
 );
 
 // tot_commit - Submit agent results
 server.tool(
   "tot_commit",
-  "Submit completed agent results. Returns updated graph and next round requirements.",
+  "Submit results. States: EXPLORE (needs 2+ children), DEAD, FOUND.",
   {
-    sessionId: z.string().describe("The investigation session ID"),
+    sessionId: z.string().describe("Session ID"),
     results: z
       .array(
         z.object({
-          nodeId: z.string().describe("The node ID"),
-          state: z.enum(["DRILL", "VERIFY", "DEAD", "VALID", "VALID_PENDING", "SPEC"]).describe("Result state"),
+          nodeId: z.string().describe("Node ID"),
+          state: z.enum(["EXPLORE", "DEAD", "FOUND"]).describe("EXPLORE=dig deeper, DEAD=dead end, FOUND=solution"),
           findings: z.string().describe("What was discovered"),
-        })
+        }),
       )
-      .describe("Results from executed agents"),
+      .describe("Results from agents"),
   },
   async (input) => {
     const results = input.results.map((r) => ({
@@ -94,24 +74,21 @@ server.tool(
       state: r.state as NodeState,
       findings: r.findings,
     }));
-    const result = await handleCommit(
-      { sessionId: input.sessionId, results },
-      PERSIST_DIR
-    );
+    const result = await handleCommit({ sessionId: input.sessionId, results }, PERSIST_DIR);
     return {
       content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
     };
-  }
+  },
 );
 
 // tot_reclassify - Change node state
 server.tool(
   "tot_reclassify",
-  "Change a node's state. Use to revive terminal nodes or correct misclassifications.",
+  "Change a node's state.",
   {
-    sessionId: z.string().describe("The investigation session ID"),
-    nodeId: z.string().describe("The node ID to reclassify"),
-    newState: z.enum(["DRILL", "VERIFY", "DEAD", "VALID", "SPEC"]).describe("New state"),
+    sessionId: z.string().describe("Session ID"),
+    nodeId: z.string().describe("Node ID"),
+    newState: z.enum(["EXPLORE", "DEAD", "FOUND"]).describe("New state"),
   },
   async (input) => {
     const result = await handleReclassify(
@@ -120,46 +97,46 @@ server.tool(
         nodeId: input.nodeId,
         newState: input.newState as NodeState,
       },
-      PERSIST_DIR
+      PERSIST_DIR,
     );
     return {
       content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
     };
-  }
+  },
 );
 
 // tot_status - Get current state
 server.tool(
   "tot_status",
-  "Get current investigation status including graph, queue, and next actions.",
+  "Get investigation status.",
   {
-    sessionId: z.string().describe("The investigation session ID"),
+    sessionId: z.string().describe("Session ID"),
   },
   async (input) => {
     const result = await handleStatus({ sessionId: input.sessionId }, PERSIST_DIR);
     return {
       content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
     };
-  }
+  },
 );
 
 // tot_end - Finalize investigation
 server.tool(
   "tot_end",
-  "Finalize the investigation. Returns final graph, solutions, and theories.",
+  "End investigation. Requires round >= 3 and all EXPLORE nodes resolved.",
   {
-    sessionId: z.string().describe("The investigation session ID"),
+    sessionId: z.string().describe("Session ID"),
   },
   async (input) => {
     const result = await handleEnd({ sessionId: input.sessionId }, PERSIST_DIR);
     return {
       content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
     };
-  }
+  },
 );
 
 // Connect via stdio
 const transport = new StdioServerTransport();
 await server.connect(transport);
 
-console.error("Tree of Thoughts MCP Server running on stdio");
+console.error("Tree of Thoughts MCP Server v2.0 running");

@@ -3,11 +3,7 @@ import { InvestigationState } from "../state/investigation";
 
 export const startInputSchema = z.object({
   query: z.string().describe("The investigation query/problem to solve"),
-  minRoots: z
-    .number()
-    .min(1)
-    .default(5)
-    .describe("Minimum number of root nodes in Round 1 (default: 5)"),
+  minRoots: z.number().min(1).default(5).describe("Minimum number of root nodes in Round 1 (default: 5)"),
 });
 
 export type StartInput = z.infer<typeof startInputSchema>;
@@ -20,10 +16,7 @@ export interface StartResult {
   instructions: string;
 }
 
-export async function handleStart(
-  input: StartInput,
-  persistDir: string = "./investigations"
-): Promise<StartResult> {
+export async function handleStart(input: StartInput, persistDir: string = "./investigations"): Promise<StartResult> {
   const query = input.query;
   const minRoots = input.minRoots ?? 5;
 
@@ -43,9 +36,8 @@ export async function handleStart(
 
 Rules:
 - Maximum 5 nodes per batch
-- DRILL nodes require >= 2 children
-- VERIFY nodes require >= 1 child
-- DEAD/VALID/SPEC are terminal (no children)
+- EXPLORE nodes require >= 2 children
+- DEAD/FOUND are terminal (no children)
 - Minimum 3 rounds before ending`,
   };
 }

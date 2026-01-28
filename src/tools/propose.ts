@@ -12,7 +12,7 @@ export const proposeInputSchema = z.object({
         parent: z.string().nullable().describe("Parent node ID or null for roots"),
         title: z.string().describe("Short title describing this node's focus"),
         plannedAction: z.string().describe("What the agent will investigate"),
-      })
+      }),
     )
     .describe("Array of proposed nodes (max 5)"),
 });
@@ -26,11 +26,7 @@ export interface ProposeResult {
   message: string;
 }
 
-export async function handlePropose(
-  input: ProposeInput,
-  persistDir: string = "./investigations"
-): Promise<ProposeResult> {
-  // Load investigation
+export async function handlePropose(input: ProposeInput, persistDir: string = "./investigations"): Promise<ProposeResult> {
   const state = InvestigationState.load(input.sessionId, persistDir);
 
   if (!state) {
@@ -41,7 +37,7 @@ export async function handlePropose(
           nodeId: "SESSION",
           error: "SESSION_NOT_FOUND",
           message: `Investigation ${input.sessionId} not found`,
-          suggestion: "Call tot_start first to create an investigation",
+          suggestion: "Call tot_start first",
         },
       ],
       approvedNodes: [],
@@ -56,14 +52,8 @@ export async function handlePropose(
     plannedAction: n.plannedAction,
   }));
 
-  // Validate batch
+  // Validate batch (max 5, no duplicates, valid parents)
   const errors = Validator.validateProposedBatch(proposed, state);
-
-  // Check min roots for round 1
-  const rootNodes = proposed.filter((n) => n.parent === null);
-  if (state.data.currentRound === 1 && rootNodes.length > 0) {
-    errors.push(...Validator.validateMinRoots(state, rootNodes.length));
-  }
 
   if (errors.length > 0) {
     return {
@@ -74,7 +64,7 @@ export async function handlePropose(
     };
   }
 
-  // Store pending proposals for later validation during commit
+  // Store pending proposals
   state.addPendingProposals(proposed);
   state.save();
 
@@ -82,6 +72,6 @@ export async function handlePropose(
     status: "OK",
     errors: [],
     approvedNodes: proposed.map((n) => n.id),
-    message: `Batch approved. Spawn agents for: ${proposed.map((n) => n.id).join(", ")}. Then call tot_commit with results.`,
+    message: `Approved: ${proposed.map((n) => n.id).join(", ")}. Spawn agents, then call tot_commit.`,
   };
 }
