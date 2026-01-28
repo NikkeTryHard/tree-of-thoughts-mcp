@@ -2,6 +2,7 @@ import { z } from "zod";
 import { InvestigationState } from "../state/investigation";
 import { Validator } from "../state/validation";
 import { DotGenerator } from "../state/dot-generator";
+import { QualityCalculator, type QualityMetrics } from "../state/quality";
 import { NodeState, isTerminalState, getRequiredChildren } from "../types";
 
 export const statusInputSchema = z.object({
@@ -25,6 +26,7 @@ export interface StatusResult {
   endBlocker?: string;
   dot: string;
   nextActions: string[];
+  quality?: QualityMetrics;
 }
 
 export async function handleStatus(
@@ -66,6 +68,7 @@ export async function handleStatus(
   }
 
   const canEndResult = Validator.canEndInvestigation(state);
+  const quality = QualityCalculator.calculate(state);
 
   const nextActions: string[] = [];
   if (nodesInQueue > 0) {
@@ -91,5 +94,6 @@ export async function handleStatus(
     endBlocker: canEndResult.reason,
     dot: DotGenerator.generate(state),
     nextActions,
+    quality,
   };
 }

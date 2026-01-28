@@ -81,7 +81,7 @@ export async function handleCommit(
   // Validate evidence for terminal states (min 50 chars)
   const MIN_EVIDENCE_LENGTH = 50;
   for (const result of input.results) {
-    if (isTerminalState(result.state)) {
+    if (isTerminalState(result.state) || result.state === NodeState.VALID_PENDING) {
       if (!result.evidence || result.evidence.length < MIN_EVIDENCE_LENGTH) {
         errors.push({
           nodeId: result.nodeId,

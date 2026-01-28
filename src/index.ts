@@ -82,7 +82,7 @@ server.tool(
       .array(
         z.object({
           nodeId: z.string().describe("The node ID"),
-          state: z.enum(["DRILL", "VERIFY", "DEAD", "VALID", "SPEC"]).describe("Result state"),
+          state: z.enum(["DRILL", "VERIFY", "DEAD", "VALID", "VALID_PENDING", "SPEC"]).describe("Result state"),
           findings: z.string().describe("What was discovered"),
         })
       )
