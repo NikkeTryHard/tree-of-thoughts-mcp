@@ -185,6 +185,16 @@ export class Validator {
     // Quality gate - require minimum composite score
     const quality = QualityCalculator.calculate(state);
     const MIN_QUALITY_SCORE = 0.5;
+    const MIN_DEPTH = 4;
+
+    // Minimum depth requirement
+    if (quality.maxDepth < MIN_DEPTH) {
+      return {
+        canEnd: false,
+        reason: `Investigation must reach depth ${MIN_DEPTH}. Current max depth: ${quality.maxDepth}`,
+        qualityScore: quality.compositeScore,
+      };
+    }
 
     if (quality.compositeScore < MIN_QUALITY_SCORE) {
       return {

@@ -177,6 +177,24 @@ describe("Validator", () => {
     expect(result.canEnd).toBe(true);
     expect(result.qualityScore).toBeGreaterThanOrEqual(0.5);
   });
+
+  test("rejects end when max depth < 4", () => {
+    const state = InvestigationState.create("Test", 1, TEST_DIR);
+    state.data.currentRound = 3;
+
+    // Only depth 3 - should be rejected
+    state.addNode({ id: "R1.A", parent: null, state: NodeState.DRILL, title: "A", findings: null, children: [], round: 1 });
+    state.addNode({ id: "R2.A1", parent: "R1.A", state: NodeState.DRILL, title: "A1", findings: null, children: [], round: 2 });
+    state.addNode({ id: "R2.A2", parent: "R1.A", state: NodeState.DEAD, title: "A2", findings: "Dead", children: [], round: 2 });
+    state.addNode({ id: "R2.A3", parent: "R1.A", state: NodeState.DEAD, title: "A3", findings: "Dead", children: [], round: 2 });
+    state.addNode({ id: "R3.A1a", parent: "R2.A1", state: NodeState.VALID, title: "A1a", findings: "Found", children: [], round: 3 });
+    state.addNode({ id: "R3.A1b", parent: "R2.A1", state: NodeState.DEAD, title: "A1b", findings: "Dead", children: [], round: 3 });
+    state.addNode({ id: "R3.A1c", parent: "R2.A1", state: NodeState.DEAD, title: "A1c", findings: "Dead", children: [], round: 3 });
+
+    const result = Validator.canEndInvestigation(state);
+    expect(result.canEnd).toBe(false);
+    expect(result.reason).toContain("depth");
+  });
 });
 
 describe("Terminal Ratio Validation", () => {
