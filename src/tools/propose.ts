@@ -45,11 +45,13 @@ export async function handlePropose(input: ProposeInput, persistDir: string = ".
     };
   }
 
+  const now = Date.now();
   const proposed: ProposedNode[] = input.nodes.map((n) => ({
     id: n.id,
     parent: n.parent,
     title: n.title,
     plannedAction: n.plannedAction,
+    proposedAt: now,
   }));
 
   // Validate batch (no duplicates, valid parents)
