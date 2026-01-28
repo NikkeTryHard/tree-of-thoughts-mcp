@@ -5,6 +5,15 @@ description: Multi-path investigation with parallel agents
 
 # Tree of Thoughts
 
+## CRITICAL: Protocol Completion is MANDATORY
+
+**You MUST complete the FULL protocol. Presenting results without calling `tot_end` is FORBIDDEN.**
+
+- You MUST reach Round 5 minimum
+- You MUST have FOUND nodes at R4+ with VERIFY children
+- You MUST call `tot_end` to finalize - NO exceptions
+- Stopping early and writing your own summary is PROTOCOL VIOLATION
+
 ## CRITICAL: Agent Spawning is MANDATORY
 
 **You MUST spawn a Task agent for EVERY proposed node.** The MCP tracks timing and agentId.
