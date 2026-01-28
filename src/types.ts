@@ -49,6 +49,7 @@ export interface CommitResult {
   nodeId: string;
   state: NodeState;
   findings: string;
+  agentId?: string; // Optional but warned if missing
 }
 
 export interface Investigation {

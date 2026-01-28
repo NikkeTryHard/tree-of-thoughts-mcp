@@ -14,6 +14,27 @@ describe("ProposedNode", () => {
   });
 });
 
+describe("CommitResult", () => {
+  it("should have optional agentId field", () => {
+    const result: CommitResult = {
+      nodeId: "R1.A",
+      state: NodeState.EXPLORE,
+      findings: "Test findings",
+      agentId: "agent-123",
+    };
+    expect(result.agentId).toBe("agent-123");
+  });
+
+  it("should allow missing agentId", () => {
+    const result: CommitResult = {
+      nodeId: "R1.A",
+      state: NodeState.EXPLORE,
+      findings: "Test findings",
+    };
+    expect(result.agentId).toBeUndefined();
+  });
+});
+
 describe("VERIFY state", () => {
   it("VERIFY is terminal", () => {
     expect(isTerminalState(NodeState.VERIFY)).toBe(true);
