@@ -19,7 +19,7 @@ describe("Tree of Thoughts Integration", () => {
 
   test("complete workflow: start -> propose -> commit -> end with VERIFY", async () => {
     // Round 1 - Single root paradigm
-    const startResult = await handleStart({ query: "Test query" }, TEST_DIR);
+    const startResult = await handleStart({ query: "Test query", projectDir: "/tmp/test-project" }, TEST_DIR);
     expect(startResult.sessionId).toBeDefined();
     const sessionId = startResult.sessionId;
 
@@ -147,7 +147,7 @@ describe("Tree of Thoughts Integration", () => {
   });
 
   test("rejects end before round 5", async () => {
-    const startResult = await handleStart({ query: "Test" }, TEST_DIR);
+    const startResult = await handleStart({ query: "Test", projectDir: "/tmp/test-project" }, TEST_DIR);
     const sessionId = startResult.sessionId;
 
     await handlePropose(
@@ -173,7 +173,7 @@ describe("Tree of Thoughts Integration", () => {
   });
 
   test("rejects commit without propose", async () => {
-    const startResult = await handleStart({ query: "Test" }, TEST_DIR);
+    const startResult = await handleStart({ query: "Test", projectDir: "/tmp/test-project" }, TEST_DIR);
 
     const commitResult = await handleCommit(
       {
@@ -188,7 +188,7 @@ describe("Tree of Thoughts Integration", () => {
   });
 
   test("rejects tot_end when EXPLORE node has < 2 children", async () => {
-    const startResult = await handleStart({ query: "Test EXPLORE enforcement" }, TEST_DIR);
+    const startResult = await handleStart({ query: "Test EXPLORE enforcement", projectDir: "/tmp/test-project" }, TEST_DIR);
     const sessionId = startResult.sessionId;
 
     // Round 1

@@ -55,6 +55,7 @@ export interface CommitResult {
 export interface Investigation {
   sessionId: string;
   query: string;
+  projectDir: string; // For agent verification
   minRoots: number;
   currentRound: number;
   currentBatch: number;

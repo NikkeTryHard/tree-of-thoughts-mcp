@@ -3,6 +3,7 @@ import { InvestigationState } from "../state/investigation";
 import { DotGenerator } from "../state/dot-generator";
 import { Validator, getIncompleteExploreNodes } from "../state/validation";
 import { NodeState, getRequiredChildren, isTerminalState, type ValidationError } from "../types";
+import { verifyAgent } from "../utils/agent-verifier";
 
 const MIN_RESEARCH_TIME_MS = 10000; // 10 seconds minimum
 
@@ -82,7 +83,7 @@ export async function handleCommit(input: CommitInput, persistDir: string = "./i
     };
   }
 
-  // Anti-gaming checks: timing and agentId
+  // Anti-gaming checks: timing, agentId presence, and agent verification
   for (const result of input.results) {
     const proposal = state.getPendingProposal(result.nodeId);
     if (proposal) {
@@ -93,7 +94,34 @@ export async function handleCommit(input: CommitInput, persistDir: string = "./i
     }
     if (!result.agentId) {
       warnings.push(`⚠️ WARNING [MISSING_AGENT]: ${result.nodeId} has no agentId. Provide agentId from Task tool.`);
+    } else if (state.data.projectDir) {
+      // Verify agent exists in Claude Code session files
+      const verification = verifyAgent(result.agentId, state.data.projectDir);
+      if (!verification.valid) {
+        errors.push({
+          nodeId: result.nodeId,
+          error: "FAKE_AGENT",
+          message: `🚨 FAKE_AGENT: ${verification.reason}`,
+          suggestion: "Spawn a real Task agent and use its agentId",
+        });
+      } else if (verification.reason) {
+        // Valid but with a warning (e.g., couldn't find sessions to verify)
+        warnings.push(`⚠️ WARNING [UNVERIFIED_AGENT]: ${result.nodeId} - ${verification.reason}`);
+      }
     }
+  }
+
+  // If any FAKE_AGENT errors, reject the commit
+  if (errors.some((e) => e.error === "FAKE_AGENT")) {
+    return {
+      message: "🚫 REJECTED: Fake agent(s) detected. You must spawn real Task agents.",
+      status: "REJECTED",
+      errors,
+      warnings,
+      currentRound: state.data.currentRound,
+      canEnd: false,
+      pendingExplore: [],
+    };
   }
 
   // Depth enforcement: FOUND only allowed at Round 4+

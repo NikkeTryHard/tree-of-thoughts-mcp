@@ -3,6 +3,7 @@ import { InvestigationState } from "../state/investigation";
 
 export const startInputSchema = z.object({
   query: z.string().describe("The investigation query/problem to solve"),
+  projectDir: z.string().describe("Current working directory (from pwd). Used to verify agent files exist."),
 });
 
 export type StartInput = z.infer<typeof startInputSchema>;
@@ -17,7 +18,7 @@ export interface StartResult {
 export async function handleStart(input: StartInput, persistDir: string = "./investigations"): Promise<StartResult> {
   const query = input.query;
 
-  const state = InvestigationState.create(query, 1, persistDir); // Always 1 root
+  const state = InvestigationState.create(query, 1, persistDir, input.projectDir);
   state.save();
 
   return {
@@ -27,6 +28,10 @@ export async function handleStart(input: StartInput, persistDir: string = "./inv
 - If you create an EXPLORE node, you MUST propose at least 2 children for it
 - tot_end will REJECT if any EXPLORE node has < 2 children
 - This is NOT optional - incomplete EXPLORE nodes block completion
+
+🚨 VERIFICATION ENABLED: agentIds will be verified against ~/.claude/projects/.
+- Fake agentIds will be REJECTED
+- You MUST spawn real Task agents and use their agentId
 
 1. Call tot_propose with ONE root node: R1.A
 2. Spawn agent for R1.A, commit as EXPLORE

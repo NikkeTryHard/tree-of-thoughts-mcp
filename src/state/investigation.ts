@@ -12,11 +12,12 @@ export class InvestigationState {
     this.persistDir = persistDir;
   }
 
-  static create(query: string, minRoots: number = 3, persistDir: string = "./investigations"): InvestigationState {
+  static create(query: string, minRoots: number = 3, persistDir: string = "./investigations", projectDir: string = ""): InvestigationState {
     const now = new Date().toISOString();
     const data: Investigation = {
       sessionId: uuidv4(),
       query,
+      projectDir,
       minRoots,
       currentRound: 1,
       currentBatch: 0,
