@@ -42,10 +42,10 @@ export class DotGenerator {
     lines.push("  subgraph cluster_legend {");
     lines.push('    label="States";');
     lines.push("    node [width=2];");
-    lines.push(`    L_EXPLORE [label="EXPLORE\\nSpawn >= 2", fillcolor=${STATE_COLORS[NodeState.EXPLORE]}];`);
-    lines.push(`    L_FOUND [label="FOUND\\nNeeds 2 VERIFY", fillcolor=${STATE_COLORS[NodeState.FOUND]}];`);
-    lines.push(`    L_VERIFY [label="VERIFY\\nConfirmed", fillcolor=${STATE_COLORS[NodeState.VERIFY]}];`);
-    lines.push(`    L_EXHAUST [label="EXHAUST\\nNeeds DEAD", fillcolor=${STATE_COLORS[NodeState.EXHAUST]}];`);
+    lines.push(`    L_EXPLORE [label="EXPLORE\\n2+ (R1-R2), 1+ (R3+)", fillcolor=${STATE_COLORS[NodeState.EXPLORE]}];`);
+    lines.push(`    L_FOUND [label="FOUND\\n1+ child", fillcolor=${STATE_COLORS[NodeState.FOUND]}];`);
+    lines.push(`    L_VERIFY [label="VERIFY\\nTerminal", fillcolor=${STATE_COLORS[NodeState.VERIFY]}];`);
+    lines.push(`    L_EXHAUST [label="EXHAUST\\n1+ child", fillcolor=${STATE_COLORS[NodeState.EXHAUST]}];`);
     lines.push(`    L_DEAD [label="DEAD\\nStop", fillcolor=${STATE_COLORS[NodeState.DEAD]}];`);
     lines.push("  }");
     lines.push("}");
