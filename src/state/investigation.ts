@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from "uuid";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
-import { type Investigation, type ToTNode, type ProposedNode } from "../types";
+import { type Investigation, type ToTNode, type ProposedNode, NodeState } from "../types";
 
 export class InvestigationState {
   public data: Investigation;
@@ -73,17 +73,19 @@ export class InvestigationState {
     return this.data.nodes[id] ?? null;
   }
 
-  updateNode(id: string, updates: Partial<ToTNode>): void {
+  updateNode(id: string, updates: Partial<ToTNode>): boolean {
     if (this.data.nodes[id]) {
       this.data.nodes[id] = { ...this.data.nodes[id], ...updates };
+      return true;
     }
+    return false;
   }
 
   getNodesByRound(round: number): ToTNode[] {
     return Object.values(this.data.nodes).filter((n) => n.round === round);
   }
 
-  getNodesByState(state: string): ToTNode[] {
+  getNodesByState(state: NodeState): ToTNode[] {
     return Object.values(this.data.nodes).filter((n) => n.state === state);
   }
 

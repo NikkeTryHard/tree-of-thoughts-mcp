@@ -1,11 +1,18 @@
 import { z } from "zod";
 import { InvestigationState } from "../state/investigation";
-import { DotGenerator } from "../state/dot-generator";
 import { Validator, getIncompleteExploreNodes } from "../state/validation";
-import { NodeState, getRequiredChildren, isTerminalState, type ValidationError } from "../types";
+import { NodeState, type ValidationError } from "../types";
 import { verifyAgent } from "../utils/agent-verifier";
 
 const MIN_RESEARCH_TIME_MS = 10000; // 10 seconds minimum
+
+/**
+ * Extract round number from node ID (e.g., "R3.A1" -> 3)
+ */
+function extractRound(nodeId: string, defaultRound: number = 1): number {
+  const match = nodeId.match(/^R(\d+)\./);
+  return match ? parseInt(match[1], 10) : defaultRound;
+}
 
 export const commitInputSchema = z.object({
   sessionId: z.string().describe("The investigation session ID"),
@@ -13,7 +20,7 @@ export const commitInputSchema = z.object({
     .array(
       z.object({
         nodeId: z.string().describe("The node ID that was executed"),
-        state: z.nativeEnum(NodeState).describe("EXPLORE=dig deeper, FOUND=provisional (R3+, needs VERIFY), VERIFY=confirms FOUND, DEAD=dead end"),
+        state: z.nativeEnum(NodeState).describe("EXPLORE=dig deeper, FOUND=provisional (R4+, needs VERIFY), VERIFY=confirms FOUND, DEAD=dead end"),
         findings: z.string().describe("What the agent discovered"),
         agentId: z.string().optional().describe("The Task agent ID that performed the research"),
       }),
@@ -154,8 +161,7 @@ export async function handleCommit(input: CommitInput, persistDir: string = "./i
 
   // Depth enforcement: state conversions based on round
   const processedResults = input.results.map((result) => {
-    const roundMatch = result.nodeId.match(/^R(\d+)\./);
-    const round = roundMatch ? parseInt(roundMatch[1], 10) : 1;
+    const round = extractRound(result.nodeId);
 
     // FOUND only allowed at R4+
     if (result.state === NodeState.FOUND && round < MIN_ROUND_FOR_FOUND) {
@@ -188,10 +194,7 @@ export async function handleCommit(input: CommitInput, persistDir: string = "./i
   // Add nodes to state using proposal data
   for (const result of processedResults) {
     const proposal = state.getPendingProposal(result.nodeId)!;
-
-    // Extract round from ID
-    const roundMatch = result.nodeId.match(/^R(\d+)\./);
-    const round = roundMatch ? parseInt(roundMatch[1], 10) : state.data.currentRound;
+    const round = extractRound(result.nodeId, state.data.currentRound);
 
     state.addNode({
       id: result.nodeId,
@@ -207,28 +210,19 @@ export async function handleCommit(input: CommitInput, persistDir: string = "./i
     state.removePendingProposal(result.nodeId);
   }
 
-  // Find EXPLORE nodes that need children
-  const allNodes = state.getAllNodes();
-  const pendingExplore: string[] = [];
-
-  for (const node of allNodes) {
-    if (!isTerminalState(node.state)) {
-      const needed = getRequiredChildren(node.state);
-      if (node.children.length < needed) {
-        pendingExplore.push(node.id);
-      }
-    }
-  }
-
   // Update round tracking
+  const allNodes = state.getAllNodes();
   const maxRound = Math.max(...allNodes.map((n) => n.round), 1);
   state.data.currentRound = maxRound;
   state.data.currentBatch += 1;
 
   state.save();
 
-  // Add INCOMPLETE_EXPLORE warnings for nodes that need more children
+  // Get incomplete nodes (EXPLORE, FOUND, EXHAUST that need more children)
   const incompleteExplore = getIncompleteExploreNodes(state);
+  const pendingExplore = incompleteExplore.map(inc => inc.nodeId);
+
+  // Add INCOMPLETE_EXPLORE warnings for nodes that need more children
   for (const inc of incompleteExplore) {
     warnings.push(`🚨 CRITICAL [INCOMPLETE_EXPLORE]: Node ${inc.nodeId} has ${inc.has} children but REQUIRES ${inc.needs}. You MUST propose more children for this node before calling tot_end.`);
   }

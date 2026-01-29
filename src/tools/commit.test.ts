@@ -634,3 +634,140 @@ describe("FOUND requires VERIFY", () => {
     expect(result3.canEnd).toBe(true);
   });
 });
+
+describe("depth enforcement at R1", () => {
+  beforeEach(() => {
+    mkdirSync(TEST_DIR, { recursive: true });
+  });
+
+  afterEach(() => {
+    rmSync(TEST_DIR, { recursive: true, force: true });
+  });
+
+  it("converts EXHAUST to EXPLORE at R1", async () => {
+    const startResult = await handleStart({ query: "test" }, TEST_DIR);
+    const sessionId = startResult.sessionId;
+
+    await handlePropose({ sessionId, nodes: [{ id: "R1.A", parent: null, title: "R1", plannedAction: "t" }] }, TEST_DIR);
+
+    // Try EXHAUST at R1 - should convert to EXPLORE
+    const result = await handleCommit(
+      {
+        sessionId,
+        results: [{ nodeId: "R1.A", state: NodeState.EXHAUST, findings: "exhausted", agentId: "r1exhaust001" }],
+      },
+      TEST_DIR,
+    );
+
+    expect(result.status).toBe("OK");
+    expect(result.warnings.some((w) => w.includes("EXHAUST_ENFORCED"))).toBe(true);
+    expect(result.pendingExplore).toContain("R1.A");
+  });
+
+  it("converts DEAD to EXPLORE at R1", async () => {
+    const startResult = await handleStart({ query: "test" }, TEST_DIR);
+    const sessionId = startResult.sessionId;
+
+    await handlePropose({ sessionId, nodes: [{ id: "R1.A", parent: null, title: "R1", plannedAction: "t" }] }, TEST_DIR);
+
+    // Try DEAD at R1 - should convert to EXPLORE
+    const result = await handleCommit(
+      {
+        sessionId,
+        results: [{ nodeId: "R1.A", state: NodeState.DEAD, findings: "dead", agentId: "r1dead001" }],
+      },
+      TEST_DIR,
+    );
+
+    expect(result.status).toBe("OK");
+    expect(result.warnings.some((w) => w.includes("DEAD_ENFORCED") && w.includes("DEAD→EXPLORE"))).toBe(true);
+    expect(result.pendingExplore).toContain("R1.A");
+  });
+});
+
+describe("VERIFY parent validation", () => {
+  beforeEach(() => {
+    mkdirSync(TEST_DIR, { recursive: true });
+  });
+
+  afterEach(() => {
+    rmSync(TEST_DIR, { recursive: true, force: true });
+  });
+
+  it("VERIFY as child of non-FOUND parent still commits but FOUND parent requires VERIFY children", async () => {
+    const startResult = await handleStart({ query: "test" }, TEST_DIR);
+    const sessionId = startResult.sessionId;
+
+    // Build to R4 with FOUND node
+    await handlePropose({ sessionId, nodes: [{ id: "R1.A", parent: null, title: "R1", plannedAction: "t" }] }, TEST_DIR);
+    await handleCommit({ sessionId, results: [{ nodeId: "R1.A", state: NodeState.EXPLORE, findings: "x", agentId: "v000001" }] }, TEST_DIR);
+
+    await handlePropose(
+      {
+        sessionId,
+        nodes: [
+          { id: "R2.A1", parent: "R1.A", title: "R2a", plannedAction: "t" },
+          { id: "R2.A2", parent: "R1.A", title: "R2b", plannedAction: "t" },
+        ],
+      },
+      TEST_DIR,
+    );
+    await handleCommit(
+      {
+        sessionId,
+        results: [
+          { nodeId: "R2.A1", state: NodeState.EXPLORE, findings: "x", agentId: "v000002" },
+          { nodeId: "R2.A2", state: NodeState.EXPLORE, findings: "x", agentId: "v000003" },
+        ],
+      },
+      TEST_DIR,
+    );
+
+    await handlePropose(
+      {
+        sessionId,
+        nodes: [
+          { id: "R3.A1a", parent: "R2.A1", title: "R3a", plannedAction: "t" },
+          { id: "R3.A1b", parent: "R2.A1", title: "R3b", plannedAction: "t" },
+        ],
+      },
+      TEST_DIR,
+    );
+    await handleCommit(
+      {
+        sessionId,
+        results: [
+          { nodeId: "R3.A1a", state: NodeState.EXPLORE, findings: "x", agentId: "v000004" },
+          { nodeId: "R3.A1b", state: NodeState.EXPLORE, findings: "x", agentId: "v000005" },
+        ],
+      },
+      TEST_DIR,
+    );
+
+    // R4 with FOUND
+    await handlePropose(
+      {
+        sessionId,
+        nodes: [
+          { id: "R4.A1a1", parent: "R3.A1a", title: "R4a", plannedAction: "t" },
+          { id: "R4.A1a2", parent: "R3.A1a", title: "R4b", plannedAction: "t" },
+        ],
+      },
+      TEST_DIR,
+    );
+    const result = await handleCommit(
+      {
+        sessionId,
+        results: [
+          { nodeId: "R4.A1a1", state: NodeState.FOUND, findings: "solution", agentId: "v000006" },
+          { nodeId: "R4.A1a2", state: NodeState.DEAD, findings: "x", agentId: "v000007" },
+        ],
+      },
+      TEST_DIR,
+    );
+
+    // FOUND node needs VERIFY children
+    expect(result.pendingExplore).toContain("R4.A1a1");
+    expect(result.canEnd).toBe(false);
+  });
+});

@@ -51,7 +51,8 @@ export interface ProposedNode {
   proposedAt: number; // Unix timestamp when proposed
 }
 
-export interface CommitResult {
+// Input type for commit results (matches schema input)
+export interface CommitResultInput {
   nodeId: string;
   state: NodeState;
   findings: string;

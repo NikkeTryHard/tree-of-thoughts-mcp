@@ -1,6 +1,31 @@
 import { NodeState, isTerminalState, getRequiredChildren, type ValidationError, type ProposedNode } from "../types";
 import type { InvestigationState } from "./investigation";
 
+/**
+ * Check if EXHAUST nodes have only DEAD children (not just any children)
+ */
+export function getExhaustNodesWithInvalidChildren(state: InvestigationState): { nodeId: string; invalidChildren: string[] }[] {
+  const invalid: { nodeId: string; invalidChildren: string[] }[] = [];
+  const allNodes = state.getAllNodes();
+
+  for (const node of allNodes) {
+    if (node.state === NodeState.EXHAUST && node.children.length > 0) {
+      const invalidChildren: string[] = [];
+      for (const childId of node.children) {
+        const child = state.getNode(childId);
+        if (child && child.state !== NodeState.DEAD) {
+          invalidChildren.push(childId);
+        }
+      }
+      if (invalidChildren.length > 0) {
+        invalid.push({ nodeId: node.id, invalidChildren });
+      }
+    }
+  }
+
+  return invalid;
+}
+
 export function getIncompleteExploreNodes(state: InvestigationState): { nodeId: string; has: number; needs: number }[] {
   const incomplete: { nodeId: string; has: number; needs: number }[] = [];
   const allNodes = state.getAllNodes();
@@ -65,6 +90,32 @@ export class Validator {
     }
 
     return errors;
+  }
+
+  /**
+   * Validate that a VERIFY node commitment is valid (parent must be FOUND)
+   */
+  static validateVerifyParent(nodeId: string, parentId: string | null, state: InvestigationState): ValidationError | null {
+    if (parentId === null) {
+      return {
+        nodeId,
+        error: "VERIFY_NO_PARENT",
+        message: `VERIFY node ${nodeId} must have a parent`,
+        suggestion: "VERIFY nodes confirm FOUND nodes - they cannot be roots",
+      };
+    }
+
+    const parent = state.getNode(parentId);
+    if (parent && parent.state !== NodeState.FOUND) {
+      return {
+        nodeId,
+        error: "VERIFY_INVALID_PARENT",
+        message: `VERIFY node ${nodeId} parent ${parentId} is ${parent.state}, must be FOUND`,
+        suggestion: "VERIFY nodes can only be children of FOUND nodes",
+      };
+    }
+
+    return null;
   }
 
   static validateProposedBatch(proposed: ProposedNode[], state: InvestigationState): ValidationError[] {
@@ -146,7 +197,17 @@ export class Validator {
       };
     }
 
-    // Rule 3: No pending proposals
+    // Rule 3: EXHAUST nodes must have only DEAD children
+    const invalidExhaust = getExhaustNodesWithInvalidChildren(state);
+    if (invalidExhaust.length > 0) {
+      const details = invalidExhaust.map(n => `${n.nodeId} has non-DEAD children: ${n.invalidChildren.join(", ")}`).join("; ");
+      return {
+        canEnd: false,
+        reason: `BLOCKED: EXHAUST nodes require DEAD children only: ${details}`,
+      };
+    }
+
+    // Rule 4: No pending proposals
     if (state.getPendingProposalCount() > 0) {
       return {
         canEnd: false,
