@@ -757,6 +757,222 @@ describe("depth enforcement at R1", () => {
   });
 });
 
+describe("child state validation", () => {
+  beforeEach(() => {
+    mkdirSync(TEST_DIR, { recursive: true });
+  });
+
+  afterEach(() => {
+    rmSync(TEST_DIR, { recursive: true, force: true });
+  });
+
+  it("rejects EXHAUST as child of FOUND", async () => {
+    const startResult = await handleStart({ query: "test" }, TEST_DIR);
+    const sessionId = startResult.sessionId;
+
+    // Build to R4 FOUND
+    await handlePropose({ sessionId, nodes: [{ id: "R1.A", parent: null, title: "R1", plannedAction: "t" }] }, TEST_DIR);
+    await handleCommit({ sessionId, results: [{ nodeId: "R1.A", state: NodeState.EXPLORE, findings: "x", agentId: "cs000001" }] }, TEST_DIR);
+
+    await handlePropose({
+      sessionId,
+      nodes: [
+        { id: "R2.A1", parent: "R1.A", title: "R2a", plannedAction: "t" },
+        { id: "R2.A2", parent: "R1.A", title: "R2b", plannedAction: "t" },
+      ],
+    }, TEST_DIR);
+    await handleCommit({
+      sessionId,
+      results: [
+        { nodeId: "R2.A1", state: NodeState.EXPLORE, findings: "x", agentId: "cs000002" },
+        { nodeId: "R2.A2", state: NodeState.EXPLORE, findings: "x", agentId: "cs000003" },
+      ],
+    }, TEST_DIR);
+
+    await handlePropose({
+      sessionId,
+      nodes: [
+        { id: "R3.A1a", parent: "R2.A1", title: "R3a", plannedAction: "t" },
+        { id: "R3.A1b", parent: "R2.A1", title: "R3b", plannedAction: "t" },
+      ],
+    }, TEST_DIR);
+    await handleCommit({
+      sessionId,
+      results: [
+        { nodeId: "R3.A1a", state: NodeState.EXPLORE, findings: "x", agentId: "cs000004" },
+        { nodeId: "R3.A1b", state: NodeState.EXPLORE, findings: "x", agentId: "cs000005" },
+      ],
+    }, TEST_DIR);
+
+    // R4 FOUND
+    await handlePropose({
+      sessionId,
+      nodes: [
+        { id: "R4.A1a1", parent: "R3.A1a", title: "R4a", plannedAction: "t" },
+        { id: "R4.A1a2", parent: "R3.A1a", title: "R4b", plannedAction: "t" },
+      ],
+    }, TEST_DIR);
+    await handleCommit({
+      sessionId,
+      results: [
+        { nodeId: "R4.A1a1", state: NodeState.FOUND, findings: "solution", agentId: "cs000006" },
+        { nodeId: "R4.A1a2", state: NodeState.DEAD, findings: "x", agentId: "cs000007" },
+      ],
+    }, TEST_DIR);
+
+    // Try to add EXHAUST child to FOUND - should be REJECTED
+    await handlePropose({
+      sessionId,
+      nodes: [{ id: "R5.A1a1a", parent: "R4.A1a1", title: "Exhaust", plannedAction: "exhaust" }],
+    }, TEST_DIR);
+    const result = await handleCommit({
+      sessionId,
+      results: [{ nodeId: "R5.A1a1a", state: NodeState.EXHAUST, findings: "exhausted", agentId: "cs000008" }],
+    }, TEST_DIR);
+
+    expect(result.status).toBe("REJECTED");
+    expect(result.errors.some(e => e.error === "INVALID_CHILD_STATE")).toBe(true);
+    expect(result.errors.some(e => e.message.includes("EXHAUST is not a valid child of FOUND"))).toBe(true);
+  });
+
+  it("rejects FOUND as child of EXHAUST", async () => {
+    const startResult = await handleStart({ query: "test" }, TEST_DIR);
+    const sessionId = startResult.sessionId;
+
+    // Build to R4 EXHAUST
+    await handlePropose({ sessionId, nodes: [{ id: "R1.A", parent: null, title: "R1", plannedAction: "t" }] }, TEST_DIR);
+    await handleCommit({ sessionId, results: [{ nodeId: "R1.A", state: NodeState.EXPLORE, findings: "x", agentId: "cs100001" }] }, TEST_DIR);
+
+    await handlePropose({
+      sessionId,
+      nodes: [
+        { id: "R2.A1", parent: "R1.A", title: "R2a", plannedAction: "t" },
+        { id: "R2.A2", parent: "R1.A", title: "R2b", plannedAction: "t" },
+      ],
+    }, TEST_DIR);
+    await handleCommit({
+      sessionId,
+      results: [
+        { nodeId: "R2.A1", state: NodeState.EXPLORE, findings: "x", agentId: "cs100002" },
+        { nodeId: "R2.A2", state: NodeState.EXPLORE, findings: "x", agentId: "cs100003" },
+      ],
+    }, TEST_DIR);
+
+    await handlePropose({
+      sessionId,
+      nodes: [
+        { id: "R3.A1a", parent: "R2.A1", title: "R3a", plannedAction: "t" },
+        { id: "R3.A1b", parent: "R2.A1", title: "R3b", plannedAction: "t" },
+      ],
+    }, TEST_DIR);
+    await handleCommit({
+      sessionId,
+      results: [
+        { nodeId: "R3.A1a", state: NodeState.EXPLORE, findings: "x", agentId: "cs100004" },
+        { nodeId: "R3.A1b", state: NodeState.EXPLORE, findings: "x", agentId: "cs100005" },
+      ],
+    }, TEST_DIR);
+
+    // R4 EXHAUST
+    await handlePropose({
+      sessionId,
+      nodes: [
+        { id: "R4.A1a1", parent: "R3.A1a", title: "R4a", plannedAction: "t" },
+        { id: "R4.A1a2", parent: "R3.A1a", title: "R4b", plannedAction: "t" },
+      ],
+    }, TEST_DIR);
+    await handleCommit({
+      sessionId,
+      results: [
+        { nodeId: "R4.A1a1", state: NodeState.EXHAUST, findings: "exhausted", agentId: "cs100006" },
+        { nodeId: "R4.A1a2", state: NodeState.DEAD, findings: "x", agentId: "cs100007" },
+      ],
+    }, TEST_DIR);
+
+    // Try to add FOUND child to EXHAUST - should be REJECTED
+    await handlePropose({
+      sessionId,
+      nodes: [{ id: "R5.A1a1a", parent: "R4.A1a1", title: "Found", plannedAction: "found" }],
+    }, TEST_DIR);
+    const result = await handleCommit({
+      sessionId,
+      results: [{ nodeId: "R5.A1a1a", state: NodeState.FOUND, findings: "solution", agentId: "cs100008" }],
+    }, TEST_DIR);
+
+    expect(result.status).toBe("REJECTED");
+    expect(result.errors.some(e => e.error === "INVALID_CHILD_STATE")).toBe(true);
+    expect(result.errors.some(e => e.message.includes("FOUND is not a valid child of EXHAUST"))).toBe(true);
+  });
+
+  it("allows FOUND as child of FOUND", async () => {
+    const startResult = await handleStart({ query: "test" }, TEST_DIR);
+    const sessionId = startResult.sessionId;
+
+    // Build to R4 FOUND
+    await handlePropose({ sessionId, nodes: [{ id: "R1.A", parent: null, title: "R1", plannedAction: "t" }] }, TEST_DIR);
+    await handleCommit({ sessionId, results: [{ nodeId: "R1.A", state: NodeState.EXPLORE, findings: "x", agentId: "cs200001" }] }, TEST_DIR);
+
+    await handlePropose({
+      sessionId,
+      nodes: [
+        { id: "R2.A1", parent: "R1.A", title: "R2a", plannedAction: "t" },
+        { id: "R2.A2", parent: "R1.A", title: "R2b", plannedAction: "t" },
+      ],
+    }, TEST_DIR);
+    await handleCommit({
+      sessionId,
+      results: [
+        { nodeId: "R2.A1", state: NodeState.EXPLORE, findings: "x", agentId: "cs200002" },
+        { nodeId: "R2.A2", state: NodeState.EXPLORE, findings: "x", agentId: "cs200003" },
+      ],
+    }, TEST_DIR);
+
+    await handlePropose({
+      sessionId,
+      nodes: [
+        { id: "R3.A1a", parent: "R2.A1", title: "R3a", plannedAction: "t" },
+        { id: "R3.A1b", parent: "R2.A1", title: "R3b", plannedAction: "t" },
+      ],
+    }, TEST_DIR);
+    await handleCommit({
+      sessionId,
+      results: [
+        { nodeId: "R3.A1a", state: NodeState.EXPLORE, findings: "x", agentId: "cs200004" },
+        { nodeId: "R3.A1b", state: NodeState.EXPLORE, findings: "x", agentId: "cs200005" },
+      ],
+    }, TEST_DIR);
+
+    // R4 FOUND
+    await handlePropose({
+      sessionId,
+      nodes: [
+        { id: "R4.A1a1", parent: "R3.A1a", title: "R4a", plannedAction: "t" },
+        { id: "R4.A1a2", parent: "R3.A1a", title: "R4b", plannedAction: "t" },
+      ],
+    }, TEST_DIR);
+    await handleCommit({
+      sessionId,
+      results: [
+        { nodeId: "R4.A1a1", state: NodeState.FOUND, findings: "solution", agentId: "cs200006" },
+        { nodeId: "R4.A1a2", state: NodeState.DEAD, findings: "x", agentId: "cs200007" },
+      ],
+    }, TEST_DIR);
+
+    // Add FOUND child to FOUND - should be allowed
+    await handlePropose({
+      sessionId,
+      nodes: [{ id: "R5.A1a1a", parent: "R4.A1a1", title: "Found2", plannedAction: "found" }],
+    }, TEST_DIR);
+    const result = await handleCommit({
+      sessionId,
+      results: [{ nodeId: "R5.A1a1a", state: NodeState.FOUND, findings: "refined solution", agentId: "cs200008" }],
+    }, TEST_DIR);
+
+    expect(result.status).toBe("OK");
+    expect(result.errors.some(e => e.error === "INVALID_CHILD_STATE")).toBe(false);
+  });
+});
+
 describe("VERIFY parent validation", () => {
   beforeEach(() => {
     mkdirSync(TEST_DIR, { recursive: true });

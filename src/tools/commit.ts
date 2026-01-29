@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { InvestigationState } from "../state/investigation";
 import { Validator, getIncompleteExploreNodes } from "../state/validation";
-import { NodeState, type ValidationError } from "../types";
+import { NodeState, type ValidationError, getValidChildStates } from "../types";
 import { verifyAgent } from "../utils/agent-verifier";
 
 const MIN_RESEARCH_TIME_MS = 10000; // 10 seconds minimum
@@ -190,6 +190,38 @@ export async function handleCommit(input: CommitInput, persistDir: string = "./i
 
     return result;
   });
+
+  // Validate child states against parent valid children
+  for (const result of processedResults) {
+    const proposal = state.getPendingProposal(result.nodeId);
+    if (proposal && proposal.parent) {
+      const parent = state.getNode(proposal.parent);
+      if (parent) {
+        const validChildren = getValidChildStates(parent.state);
+        if (!validChildren.includes(result.state)) {
+          errors.push({
+            nodeId: result.nodeId,
+            error: "INVALID_CHILD_STATE",
+            message: `${result.state} is not a valid child of ${parent.state} node ${proposal.parent}`,
+            suggestion: `Valid children for ${parent.state}: ${validChildren.join(", ")}`,
+          });
+        }
+      }
+    }
+  }
+
+  // If any INVALID_CHILD_STATE errors, reject
+  if (errors.some(e => e.error === "INVALID_CHILD_STATE")) {
+    return {
+      message: "REJECTED: Invalid child state transitions detected.",
+      status: "REJECTED",
+      errors,
+      warnings,
+      currentRound: state.data.currentRound,
+      canEnd: false,
+      pendingExplore: [],
+    };
+  }
 
   // Add nodes to state using proposal data
   for (const result of processedResults) {
