@@ -23,6 +23,11 @@ export async function handleStart(input: StartInput, persistDir: string = "./inv
   return {
     instructions: `MANDATORY: Complete ALL steps. Do NOT present results without calling tot_end.
 
+⚠️ CRITICAL RULE: Every EXPLORE node MUST have 2+ children.
+- If you create an EXPLORE node, you MUST propose at least 2 children for it
+- tot_end will REJECT if any EXPLORE node has < 2 children
+- This is NOT optional - incomplete EXPLORE nodes block completion
+
 1. Call tot_propose with ONE root node: R1.A
 2. Spawn agent for R1.A, commit as EXPLORE
 3. Branch into 3-5 children at R2

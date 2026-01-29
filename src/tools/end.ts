@@ -79,6 +79,7 @@ export async function handleEnd(input: EndInput, persistDir: string = "./investi
 
   if (!canEndResult.canEnd) {
     return {
+      message: `🚫 REJECTED: Cannot end investigation. ${canEndResult.reason}. Fix this before calling tot_end again.`,
       status: "REJECTED",
       reason: canEndResult.reason,
       sessionId: state.data.sessionId,
