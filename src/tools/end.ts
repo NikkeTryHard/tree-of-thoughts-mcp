@@ -45,6 +45,7 @@ export interface NodeSummary {
 }
 
 export interface EndResult {
+  message?: string;
   status: "OK" | "REJECTED";
   reason?: string;
   sessionId: string;
