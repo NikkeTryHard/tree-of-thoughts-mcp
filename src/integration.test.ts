@@ -186,4 +186,103 @@ describe("Tree of Thoughts Integration", () => {
     expect(commitResult.status).toBe("REJECTED");
     expect(commitResult.errors[0].error).toBe("NOT_PROPOSED");
   });
+
+  test("rejects tot_end when EXPLORE node has < 2 children", async () => {
+    const startResult = await handleStart({ query: "Test EXPLORE enforcement" }, TEST_DIR);
+    const sessionId = startResult.sessionId;
+
+    // Round 1
+    await handlePropose(
+      {
+        sessionId,
+        nodes: [{ id: "R1.A", parent: null, title: "Root", plannedAction: "Explore" }],
+      },
+      TEST_DIR,
+    );
+    await handleCommit(
+      {
+        sessionId,
+        results: [{ nodeId: "R1.A", state: NodeState.EXPLORE, findings: "Found paths" }],
+      },
+      TEST_DIR,
+    );
+
+    // Round 2 - Add 2 children to R1.A
+    await handlePropose(
+      {
+        sessionId,
+        nodes: [
+          { id: "R2.A1", parent: "R1.A", title: "Path 1", plannedAction: "Dig" },
+          { id: "R2.A2", parent: "R1.A", title: "Path 2", plannedAction: "Dig" },
+        ],
+      },
+      TEST_DIR,
+    );
+    await handleCommit(
+      {
+        sessionId,
+        results: [
+          { nodeId: "R2.A1", state: NodeState.EXPLORE, findings: "More" }, // EXPLORE with 0 children
+          { nodeId: "R2.A2", state: NodeState.DEAD, findings: "Dead" },
+        ],
+      },
+      TEST_DIR,
+    );
+
+    // Round 3 - Only add 1 child to R2.A1 (needs 2)
+    await handlePropose(
+      {
+        sessionId,
+        nodes: [{ id: "R3.A1a", parent: "R2.A1", title: "Single child", plannedAction: "Continue" }],
+      },
+      TEST_DIR,
+    );
+    await handleCommit(
+      {
+        sessionId,
+        results: [{ nodeId: "R3.A1a", state: NodeState.DEAD, findings: "Dead end" }],
+      },
+      TEST_DIR,
+    );
+
+    // Round 4
+    await handlePropose(
+      {
+        sessionId,
+        nodes: [{ id: "R4.X", parent: "R1.A", title: "Extra", plannedAction: "Pad round" }],
+      },
+      TEST_DIR,
+    );
+    await handleCommit(
+      {
+        sessionId,
+        results: [{ nodeId: "R4.X", state: NodeState.DEAD, findings: "Dead" }],
+      },
+      TEST_DIR,
+    );
+
+    // Round 5
+    await handlePropose(
+      {
+        sessionId,
+        nodes: [{ id: "R5.Y", parent: "R1.A", title: "Extra", plannedAction: "Pad round" }],
+      },
+      TEST_DIR,
+    );
+    await handleCommit(
+      {
+        sessionId,
+        results: [{ nodeId: "R5.Y", state: NodeState.DEAD, findings: "Dead" }],
+      },
+      TEST_DIR,
+    );
+
+    // Try to end - should be REJECTED because R2.A1 (EXPLORE) only has 1 child
+    const endResult = await handleEnd({ sessionId }, TEST_DIR);
+    expect(endResult.status).toBe("REJECTED");
+    expect(endResult.reason).toContain("BLOCKED");
+    expect(endResult.reason).toContain("R2.A1");
+    expect(endResult.reason).toContain("has 1");
+    expect(endResult.reason).toContain("needs 2");
+  });
 });

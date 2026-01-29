@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { InvestigationState } from "../state/investigation";
 import { DotGenerator } from "../state/dot-generator";
-import { Validator } from "../state/validation";
+import { Validator, getIncompleteExploreNodes } from "../state/validation";
 import { NodeState, getRequiredChildren, isTerminalState, type ValidationError } from "../types";
 
 const MIN_RESEARCH_TIME_MS = 10000; // 10 seconds minimum
@@ -88,11 +88,11 @@ export async function handleCommit(input: CommitInput, persistDir: string = "./i
     if (proposal) {
       const elapsed = Date.now() - proposal.proposedAt;
       if (elapsed < MIN_RESEARCH_TIME_MS) {
-        warnings.push(`SUSPICIOUS: ${result.nodeId} committed ${Math.round(elapsed / 1000)}s after propose (min ${MIN_RESEARCH_TIME_MS / 1000}s). Was an agent actually spawned?`);
+        warnings.push(`⚠️ WARNING [SUSPICIOUS]: ${result.nodeId} committed ${Math.round(elapsed / 1000)}s after propose (min ${MIN_RESEARCH_TIME_MS / 1000}s). This looks like gaming.`);
       }
     }
     if (!result.agentId) {
-      warnings.push(`MISSING_AGENT: ${result.nodeId} has no agentId. Cannot verify research was performed.`);
+      warnings.push(`⚠️ WARNING [MISSING_AGENT]: ${result.nodeId} has no agentId. Provide agentId from Task tool.`);
     }
   }
 
@@ -103,7 +103,7 @@ export async function handleCommit(input: CommitInput, persistDir: string = "./i
     const round = roundMatch ? parseInt(roundMatch[1], 10) : 1;
 
     if (result.state === NodeState.FOUND && round < MIN_DEPTH_FOR_FOUND) {
-      warnings.push(`DEPTH_ENFORCED: ${result.nodeId} converted FOUND→EXPLORE (round ${round} < ${MIN_DEPTH_FOR_FOUND}). Add 2 children.`);
+      warnings.push(`⚠️ WARNING [DEPTH_ENFORCED]: ${result.nodeId} converted FOUND→EXPLORE (round ${round} < ${MIN_DEPTH_FOR_FOUND}). You MUST add 2+ children before proceeding.`);
       return { ...result, state: NodeState.EXPLORE };
     }
     return result;
@@ -150,6 +150,12 @@ export async function handleCommit(input: CommitInput, persistDir: string = "./i
   state.data.currentBatch += 1;
 
   state.save();
+
+  // Add INCOMPLETE_EXPLORE warnings for nodes that need more children
+  const incompleteExplore = getIncompleteExploreNodes(state);
+  for (const inc of incompleteExplore) {
+    warnings.push(`🚨 CRITICAL [INCOMPLETE_EXPLORE]: Node ${inc.nodeId} has ${inc.has} children but REQUIRES ${inc.needs}. You MUST propose more children for this node before calling tot_end.`);
+  }
 
   const canEndResult = Validator.canEndInvestigation(state);
 
