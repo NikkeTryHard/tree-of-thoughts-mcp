@@ -133,7 +133,7 @@ describe("getIncompleteExploreNodes", () => {
   test("returns FOUND nodes that need children", () => {
     const state = InvestigationState.create("Test query", 1, TEST_DIR);
 
-    // FOUND node with no children - SHOULD be returned (needs 2 VERIFY children)
+    // FOUND node with no children - SHOULD be returned (needs 1 VERIFY child)
     state.addNode({
       id: "R1.B",
       parent: null,
@@ -145,7 +145,7 @@ describe("getIncompleteExploreNodes", () => {
     });
 
     const incomplete = getIncompleteExploreNodes(state);
-    expect(incomplete).toEqual([{ nodeId: "R1.B", has: 0, needs: 2 }]);
+    expect(incomplete).toEqual([{ nodeId: "R1.B", has: 0, needs: 1 }]);
   });
 
   test("returns EXHAUST nodes that need children", () => {

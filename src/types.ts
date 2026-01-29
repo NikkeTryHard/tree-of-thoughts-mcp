@@ -20,16 +20,29 @@ export function isTerminalState(state: NodeState): boolean {
 
 // EXHAUST requires DEAD children to confirm, not just any children
 
-export function getRequiredChildren(state: NodeState): number {
+export function getRequiredChildren(state: NodeState, round: number = 1): number {
   switch (state) {
     case NodeState.EXPLORE:
-      return 2;
+      return round <= 2 ? 2 : 1; // 2+ at R1-R2, 1+ at R3+
     case NodeState.FOUND:
-      return 2; // Needs 2+ VERIFY children
+      return 1; // Was 2, now 1
     case NodeState.EXHAUST:
       return 1; // Needs 1+ DEAD children
     default:
       return 0;
+  }
+}
+
+export function getValidChildStates(parentState: NodeState): NodeState[] {
+  switch (parentState) {
+    case NodeState.EXPLORE:
+      return [NodeState.EXPLORE, NodeState.FOUND, NodeState.EXHAUST, NodeState.DEAD, NodeState.VERIFY];
+    case NodeState.FOUND:
+      return [NodeState.EXPLORE, NodeState.FOUND, NodeState.VERIFY]; // NOT EXHAUST, DEAD
+    case NodeState.EXHAUST:
+      return [NodeState.EXPLORE, NodeState.EXHAUST, NodeState.DEAD]; // NOT FOUND, VERIFY
+    default:
+      return [];
   }
 }
 

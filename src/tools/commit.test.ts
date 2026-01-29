@@ -615,23 +615,16 @@ describe("FOUND requires VERIFY", () => {
       TEST_DIR,
     );
 
-    // FOUND should need 2 VERIFY children now
+    // FOUND should need 1 VERIFY child now
     expect(result1.pendingExplore).toContain("R4.A1a1");
     expect(result1.canEnd).toBe(false);
 
-    // Add first VERIFY child - still not enough
+    // Add first VERIFY child - now complete (only needs 1)
     await handlePropose({ sessionId, nodes: [{ id: "R5.A1a1a", parent: "R4.A1a1", title: "Verify1", plannedAction: "verify" }] }, TEST_DIR);
     const result2 = await handleCommit({ sessionId, results: [{ nodeId: "R5.A1a1a", state: NodeState.VERIFY, findings: "confirmed", agentId: "c000013" }] }, TEST_DIR);
 
-    expect(result2.pendingExplore).toContain("R4.A1a1"); // Still needs 1 more
-    expect(result2.canEnd).toBe(false);
-
-    // Add second VERIFY child - now complete
-    await handlePropose({ sessionId, nodes: [{ id: "R5.A1a1b", parent: "R4.A1a1", title: "Verify2", plannedAction: "verify" }] }, TEST_DIR);
-    const result3 = await handleCommit({ sessionId, results: [{ nodeId: "R5.A1a1b", state: NodeState.VERIFY, findings: "confirmed", agentId: "c000014" }] }, TEST_DIR);
-
-    expect(result3.pendingExplore).not.toContain("R4.A1a1");
-    expect(result3.canEnd).toBe(true);
+    expect(result2.pendingExplore).not.toContain("R4.A1a1"); // Complete with 1 VERIFY
+    expect(result2.canEnd).toBe(true);
   });
 });
 
