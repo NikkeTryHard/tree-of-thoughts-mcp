@@ -155,13 +155,20 @@ export async function handleCommit(input: CommitInput, persistDir: string = "./i
   }
 
   // Depth enforcement constants
+  const R3_EXPLORE_ONLY = 3;
   const MIN_ROUND_FOR_FOUND = 4;
-  const MIN_ROUND_FOR_EXHAUST = 3;
+  const MIN_ROUND_FOR_EXHAUST = 4;  // Changed from 3
   const MIN_ROUND_FOR_DEAD = 4;
 
   // Depth enforcement: state conversions based on round
   const processedResults = input.results.map((result) => {
     const round = extractRound(result.nodeId);
+
+    // R3 EXPLORE-only rule first
+    if (round === R3_EXPLORE_ONLY && result.state !== NodeState.EXPLORE) {
+      warnings.push(`⚠️ WARNING [R3_EXPLORE_ONLY]: ${result.nodeId} converted ${result.state}→EXPLORE (R3 must be EXPLORE only).`);
+      return { ...result, state: NodeState.EXPLORE };
+    }
 
     // FOUND only allowed at R4+
     if (result.state === NodeState.FOUND && round < MIN_ROUND_FOR_FOUND) {
@@ -169,7 +176,7 @@ export async function handleCommit(input: CommitInput, persistDir: string = "./i
       return { ...result, state: NodeState.EXPLORE };
     }
 
-    // EXHAUST only allowed at R3+
+    // EXHAUST only allowed at R4+
     if (result.state === NodeState.EXHAUST && round < MIN_ROUND_FOR_EXHAUST) {
       warnings.push(`⚠️ WARNING [EXHAUST_ENFORCED]: ${result.nodeId} converted EXHAUST→EXPLORE (round ${round} < ${MIN_ROUND_FOR_EXHAUST}). You MUST add 2+ children.`);
       return { ...result, state: NodeState.EXPLORE };
@@ -177,15 +184,8 @@ export async function handleCommit(input: CommitInput, persistDir: string = "./i
 
     // DEAD only allowed at R4+
     if (result.state === NodeState.DEAD && round < MIN_ROUND_FOR_DEAD) {
-      if (round < MIN_ROUND_FOR_EXHAUST) {
-        // R1-R2: Convert to EXPLORE
-        warnings.push(`⚠️ WARNING [DEAD_ENFORCED]: ${result.nodeId} converted DEAD→EXPLORE (round ${round} < ${MIN_ROUND_FOR_EXHAUST}). You MUST add 2+ children.`);
-        return { ...result, state: NodeState.EXPLORE };
-      } else {
-        // R3: Convert to EXHAUST
-        warnings.push(`⚠️ WARNING [DEAD_ENFORCED]: ${result.nodeId} converted DEAD→EXHAUST (round ${round} < ${MIN_ROUND_FOR_DEAD}). You MUST add 1+ DEAD child.`);
-        return { ...result, state: NodeState.EXHAUST };
-      }
+      warnings.push(`⚠️ WARNING [DEAD_ENFORCED]: ${result.nodeId} converted DEAD→EXPLORE (round ${round} < ${MIN_ROUND_FOR_DEAD}). You MUST add 2+ children.`);
+      return { ...result, state: NodeState.EXPLORE };
     }
 
     return result;

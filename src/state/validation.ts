@@ -1,4 +1,4 @@
-import { NodeState, isTerminalState, getRequiredChildren, type ValidationError, type ProposedNode } from "../types";
+import { NodeState, isTerminalState, getRequiredChildren, getValidChildStates, type ValidationError, type ProposedNode } from "../types";
 import type { InvestigationState } from "./investigation";
 
 /**
@@ -33,7 +33,7 @@ export function getIncompleteExploreNodes(state: InvestigationState): { nodeId: 
   for (const node of allNodes) {
     // Check all non-terminal states that require children: EXPLORE, FOUND, EXHAUST
     if (!isTerminalState(node.state)) {
-      const required = getRequiredChildren(node.state);
+      const required = getRequiredChildren(node.state, node.round);
       if (required > 0 && node.children.length < required) {
         incomplete.push({
           nodeId: node.id,

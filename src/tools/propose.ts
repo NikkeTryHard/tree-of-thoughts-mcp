@@ -22,9 +22,12 @@ export type ProposeInput = z.infer<typeof proposeInputSchema>;
 export interface ProposeResult {
   status: "OK" | "REJECTED";
   errors: ValidationError[];
+  warnings: string[];
   approvedNodes: string[];
   message: string;
 }
+
+const R2_MIN_NODES = 5;
 
 export async function handlePropose(input: ProposeInput, persistDir: string = "./investigations"): Promise<ProposeResult> {
   const state = InvestigationState.load(input.sessionId, persistDir);
@@ -40,6 +43,7 @@ export async function handlePropose(input: ProposeInput, persistDir: string = ".
           suggestion: "Call tot_start first",
         },
       ],
+      warnings: [],
       approvedNodes: [],
       message: "Session not found",
     };
@@ -61,9 +65,20 @@ export async function handlePropose(input: ProposeInput, persistDir: string = ".
     return {
       status: "REJECTED",
       errors,
+      warnings: [],
       approvedNodes: [],
       message: `Validation failed with ${errors.length} error(s)`,
     };
+  }
+
+  // Check R2 breadth
+  const warnings: string[] = [];
+  const r2NodesInBatch = input.nodes.filter(n => n.id.startsWith("R2."));
+  const existingR2Nodes = state.getAllNodes().filter(n => n.id.startsWith("R2."));
+  const totalR2 = r2NodesInBatch.length + existingR2Nodes.length;
+
+  if (r2NodesInBatch.length > 0 && totalR2 < R2_MIN_NODES) {
+    warnings.push(`⚠️ WARNING [R2_BREADTH]: R2 will have ${totalR2} nodes (minimum recommended: ${R2_MIN_NODES}). Consider adding more branches.`);
   }
 
   // Store pending proposals
@@ -74,6 +89,7 @@ export async function handlePropose(input: ProposeInput, persistDir: string = ".
     message: `NEXT: Spawn Task agents for ${proposed.map((n) => n.id).join(", ")}. Then call tot_commit with agentIds.`,
     status: "OK",
     approvedNodes: proposed.map((n) => n.id),
+    warnings,
     errors: [],
   };
 }

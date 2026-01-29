@@ -163,7 +163,7 @@ describe("depth enforcement", () => {
       TEST_DIR,
     );
 
-    // R3 - FOUND here should be converted to EXPLORE (before R4)
+    // R3 - FOUND here should be converted to EXPLORE (R3 EXPLORE-only)
     await handlePropose(
       {
         sessionId,
@@ -187,7 +187,8 @@ describe("depth enforcement", () => {
     );
 
     expect(result.status).toBe("OK");
-    expect(result.warnings.some((w) => w.includes("DEPTH_ENFORCED"))).toBe(true);
+    // R3 EXPLORE-only rule takes precedence
+    expect(result.warnings.some((w) => w.includes("R3_EXPLORE_ONLY"))).toBe(true);
     expect(result.pendingExplore).toContain("R3.A1a");
   });
 
@@ -301,7 +302,7 @@ describe("depth enforcement", () => {
     expect(result.pendingExplore).toContain("R2.A1");
   });
 
-  it("allows EXHAUST at R3", async () => {
+  it("converts EXHAUST to EXPLORE at R3 (R3 EXPLORE-only)", async () => {
     const startResult = await handleStart({ query: "test" }, TEST_DIR);
     const sessionId = startResult.sessionId;
 
@@ -340,7 +341,7 @@ describe("depth enforcement", () => {
       TEST_DIR,
     );
 
-    // EXHAUST at R3 should be allowed
+    // EXHAUST at R3 should be converted to EXPLORE (R3 EXPLORE-only)
     const result = await handleCommit(
       {
         sessionId,
@@ -353,7 +354,85 @@ describe("depth enforcement", () => {
     );
 
     expect(result.status).toBe("OK");
+    expect(result.warnings.some((w) => w.includes("R3_EXPLORE_ONLY"))).toBe(true);
+    expect(result.pendingExplore).toContain("R3.A1a");
+  });
+
+  it("allows EXHAUST at R4", async () => {
+    const startResult = await handleStart({ query: "test" }, TEST_DIR);
+    const sessionId = startResult.sessionId;
+
+    await handlePropose({ sessionId, nodes: [{ id: "R1.A", parent: null, title: "R1", plannedAction: "t" }] }, TEST_DIR);
+    await handleCommit({ sessionId, results: [{ nodeId: "R1.A", state: NodeState.EXPLORE, findings: "x", agentId: "ex4_001" }] }, TEST_DIR);
+
+    await handlePropose(
+      {
+        sessionId,
+        nodes: [
+          { id: "R2.A1", parent: "R1.A", title: "R2a", plannedAction: "t" },
+          { id: "R2.A2", parent: "R1.A", title: "R2b", plannedAction: "t" },
+        ],
+      },
+      TEST_DIR,
+    );
+    await handleCommit(
+      {
+        sessionId,
+        results: [
+          { nodeId: "R2.A1", state: NodeState.EXPLORE, findings: "x", agentId: "ex4_002" },
+          { nodeId: "R2.A2", state: NodeState.EXPLORE, findings: "x", agentId: "ex4_003" },
+        ],
+      },
+      TEST_DIR,
+    );
+
+    await handlePropose(
+      {
+        sessionId,
+        nodes: [
+          { id: "R3.A1a", parent: "R2.A1", title: "R3a", plannedAction: "t" },
+          { id: "R3.A1b", parent: "R2.A1", title: "R3b", plannedAction: "t" },
+        ],
+      },
+      TEST_DIR,
+    );
+    await handleCommit(
+      {
+        sessionId,
+        results: [
+          { nodeId: "R3.A1a", state: NodeState.EXPLORE, findings: "x", agentId: "ex4_004" },
+          { nodeId: "R3.A1b", state: NodeState.EXPLORE, findings: "x", agentId: "ex4_005" },
+        ],
+      },
+      TEST_DIR,
+    );
+
+    await handlePropose(
+      {
+        sessionId,
+        nodes: [
+          { id: "R4.A1a1", parent: "R3.A1a", title: "R4a", plannedAction: "t" },
+          { id: "R4.A1a2", parent: "R3.A1a", title: "R4b", plannedAction: "t" },
+        ],
+      },
+      TEST_DIR,
+    );
+
+    // EXHAUST at R4 should be allowed
+    const result = await handleCommit(
+      {
+        sessionId,
+        results: [
+          { nodeId: "R4.A1a1", state: NodeState.EXHAUST, findings: "exhausted", agentId: "ex4_006" },
+          { nodeId: "R4.A1a2", state: NodeState.EXPLORE, findings: "x", agentId: "ex4_007" },
+        ],
+      },
+      TEST_DIR,
+    );
+
+    expect(result.status).toBe("OK");
     expect(result.warnings.some((w) => w.includes("EXHAUST_ENFORCED"))).toBe(false);
+    expect(result.warnings.some((w) => w.includes("R3_EXPLORE_ONLY"))).toBe(false);
   });
 
   it("converts DEAD to EXPLORE at R2", async () => {
@@ -391,7 +470,7 @@ describe("depth enforcement", () => {
     expect(result.pendingExplore).toContain("R2.A1");
   });
 
-  it("converts DEAD to EXHAUST at R3", async () => {
+  it("converts DEAD to EXPLORE at R3 (R3 EXPLORE-only)", async () => {
     const startResult = await handleStart({ query: "test" }, TEST_DIR);
     const sessionId = startResult.sessionId;
 
@@ -430,7 +509,7 @@ describe("depth enforcement", () => {
       TEST_DIR,
     );
 
-    // Try DEAD at R3 - should convert to EXHAUST
+    // Try DEAD at R3 - should convert to EXPLORE (R3 EXPLORE-only)
     const result = await handleCommit(
       {
         sessionId,
@@ -443,8 +522,8 @@ describe("depth enforcement", () => {
     );
 
     expect(result.status).toBe("OK");
-    expect(result.warnings.some((w) => w.includes("DEAD_ENFORCED") && w.includes("DEAD→EXHAUST"))).toBe(true);
-    expect(result.pendingExplore).toContain("R3.A1a"); // EXHAUST needs children too
+    expect(result.warnings.some((w) => w.includes("R3_EXPLORE_ONLY"))).toBe(true);
+    expect(result.pendingExplore).toContain("R3.A1a");
   });
 
   it("allows DEAD at R4", async () => {
