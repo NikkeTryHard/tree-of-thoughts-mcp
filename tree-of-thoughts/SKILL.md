@@ -61,16 +61,18 @@ When you spawn a Task agent, you get an agentId (e.g., `a977616`).
 10. tot_end → get final results with references
 ```
 
-## States (4 states)
+## States (5 states)
 
-| State   | Meaning              | Children   | Terminal |
-| ------- | -------------------- | ---------- | -------- |
-| EXPLORE | Dig deeper           | 2+ any     | No       |
-| FOUND   | Provisional solution | 1+ VERIFY  | No       |
-| VERIFY  | Confirms FOUND       | 0          | Yes      |
-| DEAD    | Dead end             | 0          | Yes      |
+| State   | Meaning              | Children   | Terminal | Min Round |
+| ------- | -------------------- | ---------- | -------- | --------- |
+| EXPLORE | Dig deeper           | 2+ any     | No       | R1        |
+| FOUND   | Provisional solution | 2+ VERIFY  | No       | R4        |
+| VERIFY  | Confirms FOUND       | 0          | Yes      | R5        |
+| EXHAUST | Exhausted path       | 1+ DEAD    | No       | R3        |
+| DEAD    | Confirmed dead end   | 0          | Yes      | R4        |
 
-**Key:** FOUND is NOT terminal. Every FOUND needs a VERIFY child to confirm it.
+**Key:** FOUND is NOT terminal. Every FOUND needs 2+ VERIFY children to confirm it.
+**Key:** EXHAUST is NOT terminal. Every EXHAUST needs 1+ DEAD children to confirm it.
 
 ## Node IDs
 
@@ -90,8 +92,19 @@ Round 5: R5.A1a1a (parent: R4.A1a1) - VERIFY node
 2. **Cannot end before round 5** - forces thorough investigation
 3. **EXPLORE nodes need 2+ children**
 4. **FOUND only at Round 4+** - Earlier rounds auto-convert to EXPLORE
-5. **FOUND needs 1+ VERIFY children** - Cannot end until verified
-6. Each node requires a real Task agent - no fabrication
+5. **FOUND needs 2+ VERIFY children** - Cannot end until verified
+6. **EXHAUST only at Round 3+** - Earlier rounds auto-convert to EXPLORE
+7. **DEAD only at Round 4+** - R1-R2 converts to EXPLORE, R3 converts to EXHAUST
+8. Each node requires a real Task agent - no fabrication
+
+## Auto-Conversion Rules
+
+| Attempt | At Round | Converts To |
+|---------|----------|-------------|
+| EXHAUST | R1-R2    | EXPLORE     |
+| DEAD    | R1-R2    | EXPLORE     |
+| DEAD    | R3       | EXHAUST     |
+| FOUND   | R1-R3    | EXPLORE     |
 
 ## Subagent Prompt Requirements
 
@@ -163,6 +176,8 @@ tot_end({ sessionId })
 | ---------------- | --------------------------------------------------- |
 | SUSPICIOUS       | Commit too fast after propose - no real research    |
 | DEPTH_ENFORCED   | FOUND before R4 converted to EXPLORE - add children |
+| EXHAUST_ENFORCED | EXHAUST before R3 converted to EXPLORE - add children |
+| DEAD_ENFORCED    | DEAD before R4 converted (R1-R2→EXPLORE, R3→EXHAUST) |
 | UNVERIFIED_AGENT | Could not verify agentId (no sessions found)        |
 
 ## Errors (Rejection)

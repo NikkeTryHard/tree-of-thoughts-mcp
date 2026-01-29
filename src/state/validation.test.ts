@@ -101,10 +101,10 @@ describe("getIncompleteExploreNodes", () => {
     ]);
   });
 
-  test("does not return DEAD/FOUND/VERIFY nodes", () => {
+  test("does not return DEAD/VERIFY nodes (terminal states)", () => {
     const state = InvestigationState.create("Test query", 1, TEST_DIR);
 
-    // DEAD node with no children - should NOT be returned
+    // DEAD node with no children - should NOT be returned (terminal)
     state.addNode({
       id: "R1.A",
       parent: null,
@@ -115,18 +115,7 @@ describe("getIncompleteExploreNodes", () => {
       round: 1,
     });
 
-    // FOUND node with no children - should NOT be returned (it needs VERIFY but that's different)
-    state.addNode({
-      id: "R1.B",
-      parent: null,
-      state: NodeState.FOUND,
-      title: "Found",
-      findings: "Solution",
-      children: [],
-      round: 1,
-    });
-
-    // VERIFY node with no children - should NOT be returned
+    // VERIFY node with no children - should NOT be returned (terminal)
     state.addNode({
       id: "R1.C",
       parent: null,
@@ -139,6 +128,42 @@ describe("getIncompleteExploreNodes", () => {
 
     const incomplete = getIncompleteExploreNodes(state);
     expect(incomplete).toEqual([]);
+  });
+
+  test("returns FOUND nodes that need children", () => {
+    const state = InvestigationState.create("Test query", 1, TEST_DIR);
+
+    // FOUND node with no children - SHOULD be returned (needs 2 VERIFY children)
+    state.addNode({
+      id: "R1.B",
+      parent: null,
+      state: NodeState.FOUND,
+      title: "Found",
+      findings: "Solution",
+      children: [],
+      round: 1,
+    });
+
+    const incomplete = getIncompleteExploreNodes(state);
+    expect(incomplete).toEqual([{ nodeId: "R1.B", has: 0, needs: 2 }]);
+  });
+
+  test("returns EXHAUST nodes that need children", () => {
+    const state = InvestigationState.create("Test query", 1, TEST_DIR);
+
+    // EXHAUST node with no children - SHOULD be returned (needs 1 DEAD child)
+    state.addNode({
+      id: "R1.D",
+      parent: null,
+      state: NodeState.EXHAUST,
+      title: "Exhausted",
+      findings: "Exhausted path",
+      children: [],
+      round: 1,
+    });
+
+    const incomplete = getIncompleteExploreNodes(state);
+    expect(incomplete).toEqual([{ nodeId: "R1.D", has: 0, needs: 1 }]);
   });
 
   test("returns multiple incomplete EXPLORE nodes", () => {

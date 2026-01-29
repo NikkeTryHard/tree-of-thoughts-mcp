@@ -61,20 +61,22 @@ describe("Tree of Thoughts Integration", () => {
         sessionId,
         results: [
           { nodeId: "R2.A1", state: NodeState.EXPLORE, findings: "More to explore", agentId: "a000002" },
-          { nodeId: "R2.A2", state: NodeState.DEAD, findings: "Dead end", agentId: "a000003" },
+          { nodeId: "R2.A2", state: NodeState.EXPLORE, findings: "Another path", agentId: "a000003" },
         ],
       },
       TEST_DIR,
     );
     expect(commitR2.status).toBe("OK");
 
-    // Round 3 - Continue branching (FOUND at R3 gets auto-converted to EXPLORE)
+    // Round 3 - Continue branching for both R2 children
     const proposeR3 = await handlePropose(
       {
         sessionId,
         nodes: [
           { id: "R3.A1a", parent: "R2.A1", title: "Deep A1a", plannedAction: "Continue" },
           { id: "R3.A1b", parent: "R2.A1", title: "Deep A1b", plannedAction: "Continue" },
+          { id: "R3.A2a", parent: "R2.A2", title: "Deep A2a", plannedAction: "Continue" },
+          { id: "R3.A2b", parent: "R2.A2", title: "Deep A2b", plannedAction: "Continue" },
         ],
       },
       TEST_DIR,
@@ -86,20 +88,26 @@ describe("Tree of Thoughts Integration", () => {
         sessionId,
         results: [
           { nodeId: "R3.A1a", state: NodeState.EXPLORE, findings: "Promising lead", agentId: "a000004" },
-          { nodeId: "R3.A1b", state: NodeState.DEAD, findings: "Dead end", agentId: "a000005" },
+          { nodeId: "R3.A1b", state: NodeState.EXPLORE, findings: "Another lead", agentId: "a000005" },
+          { nodeId: "R3.A2a", state: NodeState.EXHAUST, findings: "Exhausted", agentId: "a000006" },
+          { nodeId: "R3.A2b", state: NodeState.EXHAUST, findings: "Exhausted", agentId: "a000007" },
         ],
       },
       TEST_DIR,
     );
     expect(commitR3.status).toBe("OK");
 
-    // Round 4 - Can use FOUND here (R4+)
+    // Round 4 - Can use FOUND and DEAD here (R4+)
     const proposeR4 = await handlePropose(
       {
         sessionId,
         nodes: [
           { id: "R4.A1a1", parent: "R3.A1a", title: "Solution candidate", plannedAction: "Final check" },
           { id: "R4.A1a2", parent: "R3.A1a", title: "Alternative", plannedAction: "Final check" },
+          { id: "R4.A1b1", parent: "R3.A1b", title: "Check", plannedAction: "Check" },
+          { id: "R4.A1b2", parent: "R3.A1b", title: "Check", plannedAction: "Check" },
+          { id: "R4.A2a1", parent: "R3.A2a", title: "Confirm dead", plannedAction: "Confirm" },
+          { id: "R4.A2b1", parent: "R3.A2b", title: "Confirm dead", plannedAction: "Confirm" },
         ],
       },
       TEST_DIR,
@@ -110,20 +118,27 @@ describe("Tree of Thoughts Integration", () => {
       {
         sessionId,
         results: [
-          { nodeId: "R4.A1a1", state: NodeState.FOUND, findings: "Found solution", agentId: "a000006" },
-          { nodeId: "R4.A1a2", state: NodeState.DEAD, findings: "Dead end", agentId: "a000007" },
+          { nodeId: "R4.A1a1", state: NodeState.FOUND, findings: "Found solution", agentId: "a000008" },
+          { nodeId: "R4.A1a2", state: NodeState.DEAD, findings: "Dead end", agentId: "a000009" },
+          { nodeId: "R4.A1b1", state: NodeState.DEAD, findings: "Dead end", agentId: "a000010" },
+          { nodeId: "R4.A1b2", state: NodeState.DEAD, findings: "Dead end", agentId: "a000011" },
+          { nodeId: "R4.A2a1", state: NodeState.DEAD, findings: "Confirmed dead", agentId: "a000012" },
+          { nodeId: "R4.A2b1", state: NodeState.DEAD, findings: "Confirmed dead", agentId: "a000013" },
         ],
       },
       TEST_DIR,
     );
     expect(commitR4.status).toBe("OK");
-    expect(commitR4.canEnd).toBe(false); // FOUND needs VERIFY child, also need round 5
+    expect(commitR4.canEnd).toBe(false); // FOUND needs 2 VERIFY children now
 
-    // Round 5 - Add VERIFY child for R4.A1a1
+    // Round 5 - Add 2 VERIFY children for R4.A1a1
     const proposeR5 = await handlePropose(
       {
         sessionId,
-        nodes: [{ id: "R5.A1a1a", parent: "R4.A1a1", title: "Verify solution", plannedAction: "Confirm" }],
+        nodes: [
+          { id: "R5.A1a1a", parent: "R4.A1a1", title: "Verify solution 1", plannedAction: "Confirm" },
+          { id: "R5.A1a1b", parent: "R4.A1a1", title: "Verify solution 2", plannedAction: "Confirm" },
+        ],
       },
       TEST_DIR,
     );
@@ -132,7 +147,10 @@ describe("Tree of Thoughts Integration", () => {
     const commitR5 = await handleCommit(
       {
         sessionId,
-        results: [{ nodeId: "R5.A1a1a", state: NodeState.VERIFY, findings: "Confirmed", agentId: "a000008" }],
+        results: [
+          { nodeId: "R5.A1a1a", state: NodeState.VERIFY, findings: "Confirmed", agentId: "a000014" },
+          { nodeId: "R5.A1a1b", state: NodeState.VERIFY, findings: "Confirmed", agentId: "a000015" },
+        ],
       },
       TEST_DIR,
     );
@@ -143,7 +161,7 @@ describe("Tree of Thoughts Integration", () => {
     const endResult = await handleEnd({ sessionId }, TEST_DIR);
     expect(endResult.status).toBe("OK");
     expect(endResult.solutions.length).toBe(1); // R4.A1a1
-    expect(endResult.deadEnds).toBe(3); // R2.A2, R3.A1b, R4.A1a2
+    expect(endResult.deadEnds).toBe(5); // R4.A1a2, R4.A1b1, R4.A1b2, R4.A2a1, R4.A2b1
   });
 
   test("rejects end before round 5", async () => {
@@ -223,7 +241,7 @@ describe("Tree of Thoughts Integration", () => {
         sessionId,
         results: [
           { nodeId: "R2.A1", state: NodeState.EXPLORE, findings: "More", agentId: "c000002" }, // EXPLORE with 0 children
-          { nodeId: "R2.A2", state: NodeState.DEAD, findings: "Dead", agentId: "c000003" },
+          { nodeId: "R2.A2", state: NodeState.EXPLORE, findings: "More", agentId: "c000003" },
         ],
       },
       TEST_DIR,
@@ -233,14 +251,22 @@ describe("Tree of Thoughts Integration", () => {
     await handlePropose(
       {
         sessionId,
-        nodes: [{ id: "R3.A1a", parent: "R2.A1", title: "Single child", plannedAction: "Continue" }],
+        nodes: [
+          { id: "R3.A1a", parent: "R2.A1", title: "Single child", plannedAction: "Continue" },
+          { id: "R3.A2a", parent: "R2.A2", title: "Child", plannedAction: "Continue" },
+          { id: "R3.A2b", parent: "R2.A2", title: "Child", plannedAction: "Continue" },
+        ],
       },
       TEST_DIR,
     );
     await handleCommit(
       {
         sessionId,
-        results: [{ nodeId: "R3.A1a", state: NodeState.DEAD, findings: "Dead end", agentId: "c000004" }],
+        results: [
+          { nodeId: "R3.A1a", state: NodeState.EXPLORE, findings: "More", agentId: "c000004" },
+          { nodeId: "R3.A2a", state: NodeState.EXPLORE, findings: "More", agentId: "c000005" },
+          { nodeId: "R3.A2b", state: NodeState.EXPLORE, findings: "More", agentId: "c000006" },
+        ],
       },
       TEST_DIR,
     );
@@ -249,14 +275,20 @@ describe("Tree of Thoughts Integration", () => {
     await handlePropose(
       {
         sessionId,
-        nodes: [{ id: "R4.X", parent: "R1.A", title: "Extra", plannedAction: "Pad round" }],
+        nodes: [
+          { id: "R4.A1a1", parent: "R3.A1a", title: "Extra", plannedAction: "Pad round" },
+          { id: "R4.A1a2", parent: "R3.A1a", title: "Extra", plannedAction: "Pad round" },
+        ],
       },
       TEST_DIR,
     );
     await handleCommit(
       {
         sessionId,
-        results: [{ nodeId: "R4.X", state: NodeState.DEAD, findings: "Dead", agentId: "c000005" }],
+        results: [
+          { nodeId: "R4.A1a1", state: NodeState.DEAD, findings: "Dead", agentId: "c000007" },
+          { nodeId: "R4.A1a2", state: NodeState.DEAD, findings: "Dead", agentId: "c000008" },
+        ],
       },
       TEST_DIR,
     );
@@ -265,14 +297,20 @@ describe("Tree of Thoughts Integration", () => {
     await handlePropose(
       {
         sessionId,
-        nodes: [{ id: "R5.Y", parent: "R1.A", title: "Extra", plannedAction: "Pad round" }],
+        nodes: [
+          { id: "R5.A2a1", parent: "R3.A2a", title: "Extra", plannedAction: "Pad round" },
+          { id: "R5.A2a2", parent: "R3.A2a", title: "Extra", plannedAction: "Pad round" },
+        ],
       },
       TEST_DIR,
     );
     await handleCommit(
       {
         sessionId,
-        results: [{ nodeId: "R5.Y", state: NodeState.DEAD, findings: "Dead", agentId: "c000006" }],
+        results: [
+          { nodeId: "R5.A2a1", state: NodeState.DEAD, findings: "Dead", agentId: "c000009" },
+          { nodeId: "R5.A2a2", state: NodeState.DEAD, findings: "Dead", agentId: "c000010" },
+        ],
       },
       TEST_DIR,
     );

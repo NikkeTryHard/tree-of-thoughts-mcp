@@ -147,16 +147,41 @@ export async function handleCommit(input: CommitInput, persistDir: string = "./i
     }
   }
 
-  // Depth enforcement: FOUND only allowed at Round 4+
-  const MIN_DEPTH_FOR_FOUND = 4;
+  // Depth enforcement constants
+  const MIN_ROUND_FOR_FOUND = 4;
+  const MIN_ROUND_FOR_EXHAUST = 3;
+  const MIN_ROUND_FOR_DEAD = 4;
+
+  // Depth enforcement: state conversions based on round
   const processedResults = input.results.map((result) => {
     const roundMatch = result.nodeId.match(/^R(\d+)\./);
     const round = roundMatch ? parseInt(roundMatch[1], 10) : 1;
 
-    if (result.state === NodeState.FOUND && round < MIN_DEPTH_FOR_FOUND) {
-      warnings.push(`⚠️ WARNING [DEPTH_ENFORCED]: ${result.nodeId} converted FOUND→EXPLORE (round ${round} < ${MIN_DEPTH_FOR_FOUND}). You MUST add 2+ children before proceeding.`);
+    // FOUND only allowed at R4+
+    if (result.state === NodeState.FOUND && round < MIN_ROUND_FOR_FOUND) {
+      warnings.push(`⚠️ WARNING [DEPTH_ENFORCED]: ${result.nodeId} converted FOUND→EXPLORE (round ${round} < ${MIN_ROUND_FOR_FOUND}). You MUST add 2+ children.`);
       return { ...result, state: NodeState.EXPLORE };
     }
+
+    // EXHAUST only allowed at R3+
+    if (result.state === NodeState.EXHAUST && round < MIN_ROUND_FOR_EXHAUST) {
+      warnings.push(`⚠️ WARNING [EXHAUST_ENFORCED]: ${result.nodeId} converted EXHAUST→EXPLORE (round ${round} < ${MIN_ROUND_FOR_EXHAUST}). You MUST add 2+ children.`);
+      return { ...result, state: NodeState.EXPLORE };
+    }
+
+    // DEAD only allowed at R4+
+    if (result.state === NodeState.DEAD && round < MIN_ROUND_FOR_DEAD) {
+      if (round < MIN_ROUND_FOR_EXHAUST) {
+        // R1-R2: Convert to EXPLORE
+        warnings.push(`⚠️ WARNING [DEAD_ENFORCED]: ${result.nodeId} converted DEAD→EXPLORE (round ${round} < ${MIN_ROUND_FOR_EXHAUST}). You MUST add 2+ children.`);
+        return { ...result, state: NodeState.EXPLORE };
+      } else {
+        // R3: Convert to EXHAUST
+        warnings.push(`⚠️ WARNING [DEAD_ENFORCED]: ${result.nodeId} converted DEAD→EXHAUST (round ${round} < ${MIN_ROUND_FOR_DEAD}). You MUST add 1+ DEAD child.`);
+        return { ...result, state: NodeState.EXHAUST };
+      }
+    }
+
     return result;
   });
 

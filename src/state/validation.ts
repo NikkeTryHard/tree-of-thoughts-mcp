@@ -6,9 +6,10 @@ export function getIncompleteExploreNodes(state: InvestigationState): { nodeId: 
   const allNodes = state.getAllNodes();
 
   for (const node of allNodes) {
-    if (node.state === NodeState.EXPLORE) {
-      const required = getRequiredChildren(node.state); // 2
-      if (node.children.length < required) {
+    // Check all non-terminal states that require children: EXPLORE, FOUND, EXHAUST
+    if (!isTerminalState(node.state)) {
+      const required = getRequiredChildren(node.state);
+      if (required > 0 && node.children.length < required) {
         incomplete.push({
           nodeId: node.id,
           has: node.children.length,

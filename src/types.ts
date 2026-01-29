@@ -1,8 +1,9 @@
 export enum NodeState {
   EXPLORE = "EXPLORE", // Needs 2+ children to investigate further
   DEAD = "DEAD", // Dead end, no more exploration needed
-  FOUND = "FOUND", // Provisional solution, needs 1+ VERIFY children
+  FOUND = "FOUND", // Provisional solution, needs 2+ VERIFY children
   VERIFY = "VERIFY", // Confirms parent FOUND node
+  EXHAUST = "EXHAUST", // Exhausted path, needs 1+ DEAD children to confirm
 }
 
 export const STATE_COLORS: Record<NodeState, string> = {
@@ -10,18 +11,23 @@ export const STATE_COLORS: Record<NodeState, string> = {
   [NodeState.DEAD]: "red",
   [NodeState.FOUND]: "orange", // Changed from green - provisional
   [NodeState.VERIFY]: "green", // Verified solution
+  [NodeState.EXHAUST]: "gray", // Exhausted path awaiting confirmation
 };
 
 export function isTerminalState(state: NodeState): boolean {
   return state === NodeState.DEAD || state === NodeState.VERIFY;
 }
 
+// EXHAUST requires DEAD children to confirm, not just any children
+
 export function getRequiredChildren(state: NodeState): number {
   switch (state) {
     case NodeState.EXPLORE:
       return 2;
     case NodeState.FOUND:
-      return 1; // Needs VERIFY child
+      return 2; // Needs 2+ VERIFY children
+    case NodeState.EXHAUST:
+      return 1; // Needs 1+ DEAD children
     default:
       return 0;
   }

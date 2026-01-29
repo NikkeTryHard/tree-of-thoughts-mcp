@@ -48,8 +48,18 @@ describe("VERIFY state", () => {
     expect(isTerminalState(NodeState.FOUND)).toBe(false);
   });
 
-  it("FOUND requires 1 child", () => {
-    expect(getRequiredChildren(NodeState.FOUND)).toBe(1);
+  it("FOUND requires 2 children", () => {
+    expect(getRequiredChildren(NodeState.FOUND)).toBe(2);
+  });
+});
+
+describe("EXHAUST state", () => {
+  it("EXHAUST is not terminal", () => {
+    expect(isTerminalState(NodeState.EXHAUST)).toBe(false);
+  });
+
+  it("EXHAUST requires 1 child", () => {
+    expect(getRequiredChildren(NodeState.EXHAUST)).toBe(1);
   });
 });
 
