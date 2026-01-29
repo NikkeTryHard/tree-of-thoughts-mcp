@@ -140,3 +140,12 @@ tot_end({ sessionId })
 | SUSPICIOUS     | Commit too fast after propose - no real research    |
 | MISSING_AGENT  | No agentId provided - cannot verify research        |
 | DEPTH_ENFORCED | FOUND before R4 converted to EXPLORE - add children |
+
+## CRITICAL: EXPLORE Nodes Need 2+ Children
+
+**Every EXPLORE node MUST have at least 2 children.** This is ENFORCED:
+
+- `tot_commit` will warn: `🚨 CRITICAL [INCOMPLETE_EXPLORE]`
+- `tot_end` will REJECT with: `BLOCKED: X EXPLORE nodes need more children`
+
+If you create an EXPLORE node, you MUST branch it before moving on. No exceptions.
