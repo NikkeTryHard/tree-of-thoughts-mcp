@@ -65,16 +65,26 @@ When you spawn a Task agent, you get an agentId (e.g., `a977616`).
 
 ## States (5 states)
 
-| State   | Meaning              | Children   | Terminal | Min Round |
-| ------- | -------------------- | ---------- | -------- | --------- |
-| EXPLORE | Dig deeper           | 2+ any     | No       | R1        |
-| FOUND   | Provisional solution | 2+ VERIFY  | No       | R4        |
-| VERIFY  | Confirms FOUND       | 0          | Yes      | R5        |
-| EXHAUST | Exhausted path       | 1+ DEAD    | No       | R3        |
-| DEAD    | Confirmed dead end   | 0          | Yes      | R4        |
+| State   | Meaning              | Children   | Terminal | Min Round | Valid Child States |
+| ------- | -------------------- | ---------- | -------- | --------- | ------------------ |
+| EXPLORE | Dig deeper           | 2+ (R1-R2), 1+ (R3+) | No | R1 | Any |
+| FOUND   | Provisional solution | 1+ any     | No       | R4        | EXPLORE, FOUND, VERIFY |
+| VERIFY  | Confirms FOUND       | 0          | Yes      | R4        | - |
+| EXHAUST | Exhausted path       | 1+ any     | No       | R4        | EXPLORE, EXHAUST, DEAD |
+| DEAD    | Confirmed dead end   | 0          | Yes      | R4        | - |
 
-**Key:** FOUND is NOT terminal. Every FOUND needs 2+ VERIFY children to confirm it.
-**Key:** EXHAUST is NOT terminal. Every EXHAUST needs 1+ DEAD children to confirm it.
+**Key Changes:**
+- FOUND needs only 1+ child (any of: EXPLORE, FOUND, VERIFY)
+- EXHAUST needs only 1+ child (any of: EXPLORE, EXHAUST, DEAD)
+- EXPLORE at R3+ needs only 1+ child (relaxed from 2+)
+- R3 must be EXPLORE only (forces deeper investigation)
+- R2 should have 5+ nodes (warning if fewer)
+
+**Invalid Transitions (Semantic Conflicts):**
+| From | Cannot Go To | Why |
+|------|--------------|-----|
+| FOUND | EXHAUST, DEAD | Found something → can't be exhausted/dead |
+| EXHAUST | FOUND, VERIFY | Exhausted path → can't suddenly find/verify |
 
 ## Node IDs
 
@@ -90,22 +100,23 @@ Round 5: R5.A1a1a (parent: R4.A1a1) - VERIFY node
 
 ## Rules
 
-1. **Single root R1.A** - then branch wide at R2
+1. **Single root R1.A** - then branch wide at R2 (5+ nodes recommended)
 2. **Cannot end before round 5** - forces thorough investigation
-3. **EXPLORE nodes need 2+ children**
-4. **FOUND only at Round 4+** - Earlier rounds auto-convert to EXPLORE
-5. **FOUND needs 2+ VERIFY children** - Cannot end until verified
-6. **EXHAUST only at Round 3+** - Earlier rounds auto-convert to EXPLORE
-7. **DEAD only at Round 4+** - R1-R2 converts to EXPLORE, R3 converts to EXHAUST
-8. Each node requires a real Task agent - no fabrication
+3. **EXPLORE nodes need 2+ children at R1-R2, 1+ at R3+** - relaxed requirements later
+4. **R3 must be EXPLORE only** - forces deeper investigation before conclusions
+5. **FOUND only at Round 4+** - Earlier rounds auto-convert to EXPLORE
+6. **FOUND needs 1+ child** (EXPLORE, FOUND, or VERIFY) - Cannot end until verified
+7. **EXHAUST only at Round 4+** - Earlier rounds auto-convert to EXPLORE
+8. **EXHAUST needs 1+ child** (EXPLORE, EXHAUST, or DEAD) - Cannot end unconfirmed
+9. **DEAD only at Round 4+** - R1-R3 converts to EXPLORE
+10. Each node requires a real Task agent - no fabrication
 
 ## Auto-Conversion Rules
 
 | Attempt | At Round | Converts To |
 |---------|----------|-------------|
-| EXHAUST | R1-R2    | EXPLORE     |
-| DEAD    | R1-R2    | EXPLORE     |
-| DEAD    | R3       | EXHAUST     |
+| EXHAUST | R1-R3    | EXPLORE     |
+| DEAD    | R1-R3    | EXPLORE     |
 | FOUND   | R1-R3    | EXPLORE     |
 
 ## Subagent Prompt Requirements
@@ -177,9 +188,8 @@ tot_end({ sessionId })
 | Warning          | Meaning                                             |
 | ---------------- | --------------------------------------------------- |
 | SUSPICIOUS       | Commit too fast after propose - no real research    |
-| DEPTH_ENFORCED   | FOUND before R4 converted to EXPLORE - add children |
-| EXHAUST_ENFORCED | EXHAUST before R3 converted to EXPLORE - add children |
-| DEAD_ENFORCED    | DEAD before R4 converted (R1-R2→EXPLORE, R3→EXHAUST) |
+| DEPTH_ENFORCED   | State before R4 converted to EXPLORE - add children |
+| LOW_BRANCHING    | R2 has fewer than 5 nodes - consider adding more    |
 | UNVERIFIED_AGENT | Could not verify agentId (no sessions found)        |
 
 ## Errors (Rejection)
@@ -191,11 +201,11 @@ tot_end({ sessionId })
 | FAKE_AGENT    | agentId not found in Claude Code sessions      |
 | NOT_PROPOSED  | Node was not proposed before commit            |
 
-## CRITICAL: EXPLORE Nodes Need 2+ Children
+## CRITICAL: EXPLORE Nodes Need Children
 
-**Every EXPLORE node MUST have at least 2 children.** This is ENFORCED:
+**EXPLORE nodes MUST have children (2+ at R1-R2, 1+ at R3+).** This is ENFORCED:
 
-- `tot_commit` will warn: `🚨 CRITICAL [INCOMPLETE_EXPLORE]`
+- `tot_commit` will warn: `CRITICAL [INCOMPLETE_EXPLORE]`
 - `tot_end` will REJECT with: `BLOCKED: X EXPLORE nodes need more children`
 
 If you create an EXPLORE node, you MUST branch it before moving on. No exceptions.
