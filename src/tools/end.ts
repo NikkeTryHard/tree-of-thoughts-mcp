@@ -107,14 +107,15 @@ export async function handleEnd(input: EndInput, persistDir: string = "./investi
   const deadEnds = allNodes.filter((n) => n.state === NodeState.DEAD).length;
 
   return {
+    message: `Investigation complete. ${solutions.length} solutions found, ${deadEnds} dead ends.`,
     status: "OK",
     sessionId: state.data.sessionId,
     query: state.data.query,
     totalRounds: state.data.currentRound,
     totalNodes: allNodes.length,
-    finalDot: DotGenerator.generate(state),
     solutions,
     deadEnds,
     references,
+    finalDot: DotGenerator.generate(state),
   };
 }

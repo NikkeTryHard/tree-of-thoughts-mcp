@@ -69,6 +69,7 @@ export async function handleStatus(input: StatusInput, persistDir: string = "./i
   }
 
   return {
+    nextAction,
     status: "OK",
     sessionId: state.data.sessionId,
     query: state.data.query,
@@ -80,6 +81,5 @@ export async function handleStatus(input: StatusInput, persistDir: string = "./i
     canEnd: canEndResult.canEnd,
     endBlocker: canEndResult.reason,
     dot: DotGenerator.generate(state),
-    nextAction,
   };
 }

@@ -84,12 +84,12 @@ export async function handleReclassify(
   state.save();
 
   return {
+    message: `Node ${input.nodeId} reclassified from ${previousState} to ${input.newState}`,
     status: "OK",
     errors: [],
     nodeId: input.nodeId,
     previousState,
     newState: input.newState,
     dot: DotGenerator.generate(state),
-    message: `Node ${input.nodeId} reclassified from ${previousState} to ${input.newState}`,
   };
 }
