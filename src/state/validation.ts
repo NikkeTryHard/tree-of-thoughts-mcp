@@ -1,6 +1,26 @@
 import { NodeState, isTerminalState, getRequiredChildren, type ValidationError, type ProposedNode } from "../types";
 import type { InvestigationState } from "./investigation";
 
+export function getIncompleteExploreNodes(state: InvestigationState): { nodeId: string; has: number; needs: number }[] {
+  const incomplete: { nodeId: string; has: number; needs: number }[] = [];
+  const allNodes = state.getAllNodes();
+
+  for (const node of allNodes) {
+    if (node.state === NodeState.EXPLORE) {
+      const required = getRequiredChildren(node.state); // 2
+      if (node.children.length < required) {
+        incomplete.push({
+          nodeId: node.id,
+          has: node.children.length,
+          needs: required,
+        });
+      }
+    }
+  }
+
+  return incomplete;
+}
+
 export class Validator {
   static validateProposedNode(proposed: ProposedNode, state: InvestigationState): ValidationError[] {
     const errors: ValidationError[] = [];
