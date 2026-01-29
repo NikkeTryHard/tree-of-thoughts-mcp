@@ -136,17 +136,12 @@ export class Validator {
     }
 
     // Rule 2: All EXPLORE nodes must have 2+ children
-    const allNodes = state.getAllNodes();
-    const unresolvedNodes = allNodes.filter((n) => {
-      if (isTerminalState(n.state)) return false;
-      const required = getRequiredChildren(n.state);
-      return n.children.length < required;
-    });
-
-    if (unresolvedNodes.length > 0) {
+    const incompleteExplore = getIncompleteExploreNodes(state);
+    if (incompleteExplore.length > 0) {
+      const details = incompleteExplore.map(n => `${n.nodeId} (has ${n.has}, needs ${n.needs})`).join(", ");
       return {
         canEnd: false,
-        reason: `${unresolvedNodes.length} EXPLORE nodes need children: ${unresolvedNodes.map((n) => n.id).join(", ")}`,
+        reason: `BLOCKED: ${incompleteExplore.length} EXPLORE nodes need more children: ${details}`,
       };
     }
 
