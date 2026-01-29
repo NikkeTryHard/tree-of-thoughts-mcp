@@ -24,10 +24,10 @@ describe("anti-gaming: timing", () => {
       nodes: [{ id: "R1.A", parent: null, title: "Test", plannedAction: "Test" }],
     }, TEST_DIR);
 
-    // Immediate commit (no agent spawned)
+    // Immediate commit (no real agent work done)
     const result = await handleCommit({
       sessionId: start.sessionId,
-      results: [{ nodeId: "R1.A", state: NodeState.EXPLORE, findings: "Fake" }],
+      results: [{ nodeId: "R1.A", state: NodeState.EXPLORE, findings: "Fake", agentId: "abc1234" }],
     }, TEST_DIR);
 
     expect(result.warnings.some(w => w.includes("SUSPICIOUS"))).toBe(true);
@@ -43,7 +43,7 @@ describe("anti-gaming: agentId", () => {
     rmSync(TEST_DIR, { recursive: true, force: true });
   });
 
-  it("warns MISSING_AGENT if no agentId provided", async () => {
+  it("rejects MISSING_AGENT if no agentId provided", async () => {
     const start = await handleStart({ query: "Test" }, TEST_DIR);
 
     await handlePropose({
@@ -51,13 +51,50 @@ describe("anti-gaming: agentId", () => {
       nodes: [{ id: "R1.A", parent: null, title: "Test", plannedAction: "Test" }],
     }, TEST_DIR);
 
-    // Commit without agentId
+    // Commit without agentId - should be REJECTED
     const result = await handleCommit({
       sessionId: start.sessionId,
       results: [{ nodeId: "R1.A", state: NodeState.EXPLORE, findings: "Test" }],
     }, TEST_DIR);
 
-    expect(result.warnings.some(w => w.includes("MISSING_AGENT"))).toBe(true);
+    expect(result.status).toBe("REJECTED");
+    expect(result.errors.some(e => e.error === "MISSING_AGENT")).toBe(true);
+  });
+
+  it("rejects REUSED_AGENT if same agentId used twice", async () => {
+    const start = await handleStart({ query: "Test" }, TEST_DIR);
+
+    await handlePropose({
+      sessionId: start.sessionId,
+      nodes: [{ id: "R1.A", parent: null, title: "Test", plannedAction: "Test" }],
+    }, TEST_DIR);
+
+    // First commit with agentId
+    await handleCommit({
+      sessionId: start.sessionId,
+      results: [{ nodeId: "R1.A", state: NodeState.EXPLORE, findings: "Test", agentId: "abc1234" }],
+    }, TEST_DIR);
+
+    // Propose children
+    await handlePropose({
+      sessionId: start.sessionId,
+      nodes: [
+        { id: "R2.A1", parent: "R1.A", title: "Child1", plannedAction: "Test" },
+        { id: "R2.A2", parent: "R1.A", title: "Child2", plannedAction: "Test" },
+      ],
+    }, TEST_DIR);
+
+    // Try to reuse the same agentId - should be REJECTED
+    const result = await handleCommit({
+      sessionId: start.sessionId,
+      results: [
+        { nodeId: "R2.A1", state: NodeState.EXPLORE, findings: "Test", agentId: "abc1234" },
+        { nodeId: "R2.A2", state: NodeState.DEAD, findings: "Test", agentId: "def5678" },
+      ],
+    }, TEST_DIR);
+
+    expect(result.status).toBe("REJECTED");
+    expect(result.errors.some(e => e.error === "REUSED_AGENT")).toBe(true);
   });
 
   it("no warning if agentId provided", async () => {
@@ -100,7 +137,7 @@ describe("depth enforcement", () => {
     await handleCommit(
       {
         sessionId,
-        results: [{ nodeId: "R1.A", state: NodeState.EXPLORE, findings: "x" }],
+        results: [{ nodeId: "R1.A", state: NodeState.EXPLORE, findings: "x", agentId: "a000001" }],
       },
       TEST_DIR,
     );
@@ -119,8 +156,8 @@ describe("depth enforcement", () => {
       {
         sessionId,
         results: [
-          { nodeId: "R2.A1", state: NodeState.EXPLORE, findings: "x" },
-          { nodeId: "R2.A2", state: NodeState.DEAD, findings: "x" },
+          { nodeId: "R2.A1", state: NodeState.EXPLORE, findings: "x", agentId: "a000002" },
+          { nodeId: "R2.A2", state: NodeState.DEAD, findings: "x", agentId: "a000003" },
         ],
       },
       TEST_DIR,
@@ -142,8 +179,8 @@ describe("depth enforcement", () => {
       {
         sessionId,
         results: [
-          { nodeId: "R3.A1a", state: NodeState.FOUND, findings: "solution" },
-          { nodeId: "R3.A1b", state: NodeState.DEAD, findings: "dead" },
+          { nodeId: "R3.A1a", state: NodeState.FOUND, findings: "solution", agentId: "a000004" },
+          { nodeId: "R3.A1b", state: NodeState.DEAD, findings: "dead", agentId: "a000005" },
         ],
       },
       TEST_DIR,
@@ -160,7 +197,7 @@ describe("depth enforcement", () => {
 
     // Build to R4
     await handlePropose({ sessionId, nodes: [{ id: "R1.A", parent: null, title: "R1", plannedAction: "t" }] }, TEST_DIR);
-    await handleCommit({ sessionId, results: [{ nodeId: "R1.A", state: NodeState.EXPLORE, findings: "x" }] }, TEST_DIR);
+    await handleCommit({ sessionId, results: [{ nodeId: "R1.A", state: NodeState.EXPLORE, findings: "x", agentId: "b000001" }] }, TEST_DIR);
 
     await handlePropose(
       {
@@ -176,8 +213,8 @@ describe("depth enforcement", () => {
       {
         sessionId,
         results: [
-          { nodeId: "R2.A1", state: NodeState.EXPLORE, findings: "x" },
-          { nodeId: "R2.A2", state: NodeState.DEAD, findings: "x" },
+          { nodeId: "R2.A1", state: NodeState.EXPLORE, findings: "x", agentId: "b000002" },
+          { nodeId: "R2.A2", state: NodeState.DEAD, findings: "x", agentId: "b000003" },
         ],
       },
       TEST_DIR,
@@ -197,8 +234,8 @@ describe("depth enforcement", () => {
       {
         sessionId,
         results: [
-          { nodeId: "R3.A1a", state: NodeState.EXPLORE, findings: "x" },
-          { nodeId: "R3.A1b", state: NodeState.DEAD, findings: "x" },
+          { nodeId: "R3.A1a", state: NodeState.EXPLORE, findings: "x", agentId: "b000004" },
+          { nodeId: "R3.A1b", state: NodeState.DEAD, findings: "x", agentId: "b000005" },
         ],
       },
       TEST_DIR,
@@ -219,8 +256,8 @@ describe("depth enforcement", () => {
       {
         sessionId,
         results: [
-          { nodeId: "R4.A1a1", state: NodeState.FOUND, findings: "solution" },
-          { nodeId: "R4.A1a2", state: NodeState.DEAD, findings: "x" },
+          { nodeId: "R4.A1a1", state: NodeState.FOUND, findings: "solution", agentId: "b000006" },
+          { nodeId: "R4.A1a2", state: NodeState.DEAD, findings: "x", agentId: "b000007" },
         ],
       },
       TEST_DIR,
@@ -245,7 +282,7 @@ describe("FOUND requires VERIFY", () => {
 
     // Build to R4 FOUND
     await handlePropose({ sessionId, nodes: [{ id: "R1.A", parent: null, title: "R1", plannedAction: "t" }] }, TEST_DIR);
-    await handleCommit({ sessionId, results: [{ nodeId: "R1.A", state: NodeState.EXPLORE, findings: "x" }] }, TEST_DIR);
+    await handleCommit({ sessionId, results: [{ nodeId: "R1.A", state: NodeState.EXPLORE, findings: "x", agentId: "c000001" }] }, TEST_DIR);
 
     await handlePropose(
       {
@@ -261,8 +298,8 @@ describe("FOUND requires VERIFY", () => {
       {
         sessionId,
         results: [
-          { nodeId: "R2.A1", state: NodeState.EXPLORE, findings: "x" },
-          { nodeId: "R2.A2", state: NodeState.DEAD, findings: "x" },
+          { nodeId: "R2.A1", state: NodeState.EXPLORE, findings: "x", agentId: "c000002" },
+          { nodeId: "R2.A2", state: NodeState.DEAD, findings: "x", agentId: "c000003" },
         ],
       },
       TEST_DIR,
@@ -282,8 +319,8 @@ describe("FOUND requires VERIFY", () => {
       {
         sessionId,
         results: [
-          { nodeId: "R3.A1a", state: NodeState.EXPLORE, findings: "x" },
-          { nodeId: "R3.A1b", state: NodeState.DEAD, findings: "x" },
+          { nodeId: "R3.A1a", state: NodeState.EXPLORE, findings: "x", agentId: "c000004" },
+          { nodeId: "R3.A1b", state: NodeState.DEAD, findings: "x", agentId: "c000005" },
         ],
       },
       TEST_DIR,
@@ -304,8 +341,8 @@ describe("FOUND requires VERIFY", () => {
       {
         sessionId,
         results: [
-          { nodeId: "R4.A1a1", state: NodeState.FOUND, findings: "solution" },
-          { nodeId: "R4.A1a2", state: NodeState.DEAD, findings: "x" },
+          { nodeId: "R4.A1a1", state: NodeState.FOUND, findings: "solution", agentId: "c000006" },
+          { nodeId: "R4.A1a2", state: NodeState.DEAD, findings: "x", agentId: "c000007" },
         ],
       },
       TEST_DIR,
@@ -317,7 +354,7 @@ describe("FOUND requires VERIFY", () => {
 
     // Add VERIFY child
     await handlePropose({ sessionId, nodes: [{ id: "R5.A1a1a", parent: "R4.A1a1", title: "Verify", plannedAction: "verify" }] }, TEST_DIR);
-    const result2 = await handleCommit({ sessionId, results: [{ nodeId: "R5.A1a1a", state: NodeState.VERIFY, findings: "confirmed" }] }, TEST_DIR);
+    const result2 = await handleCommit({ sessionId, results: [{ nodeId: "R5.A1a1a", state: NodeState.VERIFY, findings: "confirmed", agentId: "c000008" }] }, TEST_DIR);
 
     expect(result2.pendingExplore).not.toContain("R4.A1a1");
     expect(result2.canEnd).toBe(true);

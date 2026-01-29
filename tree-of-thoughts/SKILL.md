@@ -1,6 +1,6 @@
 ---
 name: tree-of-thoughts
-description: Multi-path investigation with parallel agents
+description: Multi-path investigation with parallel agents. Use when researching complex questions requiring breadth-first exploration with verification.
 ---
 
 # Tree of Thoughts
@@ -13,19 +13,24 @@ description: Multi-path investigation with parallel agents
 - You MUST have FOUND nodes at R4+ with VERIFY children
 - You MUST call `tot_end` to finalize - NO exceptions
 - Stopping early and writing your own summary is PROTOCOL VIOLATION
+- **DO NOT present findings to user until `tot_end` returns OK**
 
 ## CRITICAL: Agent Spawning is MANDATORY
 
-**You MUST spawn a Task agent for EVERY proposed node.** The MCP tracks timing and agentId.
+**You MUST spawn a FRESH Task agent for EVERY proposed node.** The MCP tracks timing and agentId.
 
-- Commits within 10 seconds of propose trigger SUSPICIOUS warnings
-- Missing agentId triggers MISSING_AGENT warnings
-- **Fake agentIds are REJECTED** - verified against ~/.claude/projects/
-- Fabricating findings without research is PROHIBITED
+| Violation | Result |
+|-----------|--------|
+| Missing agentId | **REJECTED** - commit fails |
+| Reused agentId | **REJECTED** - each node needs NEW agent |
+| Fake agentId | **REJECTED** - verified against ~/.claude/projects/ |
+| Commit < 10s after propose | WARNING - looks like gaming |
+
+**Each node = One fresh Task agent. No exceptions. No reuse.**
 
 ## Agent Verification
 
-**agentIds are verified against Claude Code's session files.**
+**agentIds are verified against Claude Code's session files AND tracked for reuse.**
 
 When calling tot_start, you MUST provide your project directory:
 ```javascript
@@ -36,9 +41,10 @@ tot_start({
 ```
 
 When you spawn a Task agent, you get an agentId (e.g., `a977616`).
-tot_commit will verify this agent file exists in ~/.claude/projects/.
+- tot_commit verifies this agent file exists in ~/.claude/projects/
+- tot_commit tracks all used agentIds - **reusing one is REJECTED**
 
-**Fake agentIds will be REJECTED.** You cannot fabricate agent IDs.
+**Fake or reused agentIds will be REJECTED.** You cannot fabricate or recycle agent IDs.
 
 ## Workflow (Single Root Paradigm)
 
@@ -156,15 +162,17 @@ tot_end({ sessionId })
 | Warning          | Meaning                                             |
 | ---------------- | --------------------------------------------------- |
 | SUSPICIOUS       | Commit too fast after propose - no real research    |
-| MISSING_AGENT    | No agentId provided - cannot verify research        |
 | DEPTH_ENFORCED   | FOUND before R4 converted to EXPLORE - add children |
 | UNVERIFIED_AGENT | Could not verify agentId (no sessions found)        |
 
 ## Errors (Rejection)
 
-| Error       | Meaning                                     |
-| ----------- | ------------------------------------------- |
-| FAKE_AGENT  | agentId not found in Claude Code sessions   |
+| Error         | Meaning                                        |
+| ------------- | ---------------------------------------------- |
+| MISSING_AGENT | No agentId provided - you MUST spawn an agent  |
+| REUSED_AGENT  | agentId already used for another node          |
+| FAKE_AGENT    | agentId not found in Claude Code sessions      |
+| NOT_PROPOSED  | Node was not proposed before commit            |
 
 ## CRITICAL: EXPLORE Nodes Need 2+ Children
 

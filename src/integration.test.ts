@@ -36,7 +36,7 @@ describe("Tree of Thoughts Integration", () => {
     const commitR1 = await handleCommit(
       {
         sessionId,
-        results: [{ nodeId: "R1.A", state: NodeState.EXPLORE, findings: "Found paths to explore" }],
+        results: [{ nodeId: "R1.A", state: NodeState.EXPLORE, findings: "Found paths to explore", agentId: "a000001" }],
       },
       TEST_DIR,
     );
@@ -60,8 +60,8 @@ describe("Tree of Thoughts Integration", () => {
       {
         sessionId,
         results: [
-          { nodeId: "R2.A1", state: NodeState.EXPLORE, findings: "More to explore" },
-          { nodeId: "R2.A2", state: NodeState.DEAD, findings: "Dead end" },
+          { nodeId: "R2.A1", state: NodeState.EXPLORE, findings: "More to explore", agentId: "a000002" },
+          { nodeId: "R2.A2", state: NodeState.DEAD, findings: "Dead end", agentId: "a000003" },
         ],
       },
       TEST_DIR,
@@ -85,8 +85,8 @@ describe("Tree of Thoughts Integration", () => {
       {
         sessionId,
         results: [
-          { nodeId: "R3.A1a", state: NodeState.EXPLORE, findings: "Promising lead" },
-          { nodeId: "R3.A1b", state: NodeState.DEAD, findings: "Dead end" },
+          { nodeId: "R3.A1a", state: NodeState.EXPLORE, findings: "Promising lead", agentId: "a000004" },
+          { nodeId: "R3.A1b", state: NodeState.DEAD, findings: "Dead end", agentId: "a000005" },
         ],
       },
       TEST_DIR,
@@ -110,8 +110,8 @@ describe("Tree of Thoughts Integration", () => {
       {
         sessionId,
         results: [
-          { nodeId: "R4.A1a1", state: NodeState.FOUND, findings: "Found solution" },
-          { nodeId: "R4.A1a2", state: NodeState.DEAD, findings: "Dead end" },
+          { nodeId: "R4.A1a1", state: NodeState.FOUND, findings: "Found solution", agentId: "a000006" },
+          { nodeId: "R4.A1a2", state: NodeState.DEAD, findings: "Dead end", agentId: "a000007" },
         ],
       },
       TEST_DIR,
@@ -132,7 +132,7 @@ describe("Tree of Thoughts Integration", () => {
     const commitR5 = await handleCommit(
       {
         sessionId,
-        results: [{ nodeId: "R5.A1a1a", state: NodeState.VERIFY, findings: "Confirmed" }],
+        results: [{ nodeId: "R5.A1a1a", state: NodeState.VERIFY, findings: "Confirmed", agentId: "a000008" }],
       },
       TEST_DIR,
     );
@@ -162,7 +162,7 @@ describe("Tree of Thoughts Integration", () => {
     await handleCommit(
       {
         sessionId,
-        results: [{ nodeId: "R1.A", state: NodeState.FOUND, findings: "Done" }],
+        results: [{ nodeId: "R1.A", state: NodeState.FOUND, findings: "Done", agentId: "b000001" }],
       },
       TEST_DIR,
     );
@@ -178,7 +178,7 @@ describe("Tree of Thoughts Integration", () => {
     const commitResult = await handleCommit(
       {
         sessionId: startResult.sessionId,
-        results: [{ nodeId: "R1.A", state: NodeState.FOUND, findings: "Done" }],
+        results: [{ nodeId: "R1.A", state: NodeState.FOUND, findings: "Done", agentId: "b000002" }],
       },
       TEST_DIR,
     );
@@ -202,7 +202,7 @@ describe("Tree of Thoughts Integration", () => {
     await handleCommit(
       {
         sessionId,
-        results: [{ nodeId: "R1.A", state: NodeState.EXPLORE, findings: "Found paths" }],
+        results: [{ nodeId: "R1.A", state: NodeState.EXPLORE, findings: "Found paths", agentId: "c000001" }],
       },
       TEST_DIR,
     );
@@ -222,8 +222,8 @@ describe("Tree of Thoughts Integration", () => {
       {
         sessionId,
         results: [
-          { nodeId: "R2.A1", state: NodeState.EXPLORE, findings: "More" }, // EXPLORE with 0 children
-          { nodeId: "R2.A2", state: NodeState.DEAD, findings: "Dead" },
+          { nodeId: "R2.A1", state: NodeState.EXPLORE, findings: "More", agentId: "c000002" }, // EXPLORE with 0 children
+          { nodeId: "R2.A2", state: NodeState.DEAD, findings: "Dead", agentId: "c000003" },
         ],
       },
       TEST_DIR,
@@ -240,7 +240,7 @@ describe("Tree of Thoughts Integration", () => {
     await handleCommit(
       {
         sessionId,
-        results: [{ nodeId: "R3.A1a", state: NodeState.DEAD, findings: "Dead end" }],
+        results: [{ nodeId: "R3.A1a", state: NodeState.DEAD, findings: "Dead end", agentId: "c000004" }],
       },
       TEST_DIR,
     );
@@ -256,7 +256,7 @@ describe("Tree of Thoughts Integration", () => {
     await handleCommit(
       {
         sessionId,
-        results: [{ nodeId: "R4.X", state: NodeState.DEAD, findings: "Dead" }],
+        results: [{ nodeId: "R4.X", state: NodeState.DEAD, findings: "Dead", agentId: "c000005" }],
       },
       TEST_DIR,
     );
@@ -272,7 +272,7 @@ describe("Tree of Thoughts Integration", () => {
     await handleCommit(
       {
         sessionId,
-        results: [{ nodeId: "R5.Y", state: NodeState.DEAD, findings: "Dead" }],
+        results: [{ nodeId: "R5.Y", state: NodeState.DEAD, findings: "Dead", agentId: "c000006" }],
       },
       TEST_DIR,
     );

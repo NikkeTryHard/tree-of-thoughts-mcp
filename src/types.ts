@@ -61,6 +61,7 @@ export interface Investigation {
   currentBatch: number;
   nodes: Record<string, ToTNode>;
   pendingProposals: Record<string, ProposedNode>;
+  usedAgentIds: Record<string, string>; // agentId -> nodeId mapping to prevent reuse
   createdAt: string;
   updatedAt: string;
 }

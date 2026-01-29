@@ -32,6 +32,7 @@ describe("references extraction", () => {
             nodeId: "R1.A",
             state: NodeState.EXPLORE,
             findings: "Found something\n\n## References\n- https://example.com - docs",
+            agentId: "d000001",
           },
         ],
       },
@@ -52,8 +53,8 @@ describe("references extraction", () => {
       {
         sessionId,
         results: [
-          { nodeId: "R2.A1", state: NodeState.EXPLORE, findings: "x\n\n## References\n- src/file.ts" },
-          { nodeId: "R2.A2", state: NodeState.DEAD, findings: "x" },
+          { nodeId: "R2.A1", state: NodeState.EXPLORE, findings: "x\n\n## References\n- src/file.ts", agentId: "d000002" },
+          { nodeId: "R2.A2", state: NodeState.DEAD, findings: "x", agentId: "d000003" },
         ],
       },
       TEST_DIR,
@@ -73,8 +74,8 @@ describe("references extraction", () => {
       {
         sessionId,
         results: [
-          { nodeId: "R3.A1a", state: NodeState.EXPLORE, findings: "x" },
-          { nodeId: "R3.A1b", state: NodeState.DEAD, findings: "x" },
+          { nodeId: "R3.A1a", state: NodeState.EXPLORE, findings: "x", agentId: "d000004" },
+          { nodeId: "R3.A1b", state: NodeState.DEAD, findings: "x", agentId: "d000005" },
         ],
       },
       TEST_DIR,
@@ -95,8 +96,8 @@ describe("references extraction", () => {
       {
         sessionId,
         results: [
-          { nodeId: "R4.A1a1", state: NodeState.FOUND, findings: "solution\n\n## References\n- https://docs.com" },
-          { nodeId: "R4.A1a2", state: NodeState.DEAD, findings: "x" },
+          { nodeId: "R4.A1a1", state: NodeState.FOUND, findings: "solution\n\n## References\n- https://docs.com", agentId: "d000006" },
+          { nodeId: "R4.A1a2", state: NodeState.DEAD, findings: "x", agentId: "d000007" },
         ],
       },
       TEST_DIR,
@@ -104,7 +105,7 @@ describe("references extraction", () => {
 
     // R5 - VERIFY
     await handlePropose({ sessionId, nodes: [{ id: "R5.A1a1a", parent: "R4.A1a1", title: "Verify", plannedAction: "verify" }] }, TEST_DIR);
-    await handleCommit({ sessionId, results: [{ nodeId: "R5.A1a1a", state: NodeState.VERIFY, findings: "confirmed" }] }, TEST_DIR);
+    await handleCommit({ sessionId, results: [{ nodeId: "R5.A1a1a", state: NodeState.VERIFY, findings: "confirmed", agentId: "d000008" }] }, TEST_DIR);
 
     const result = await handleEnd({ sessionId }, TEST_DIR);
 

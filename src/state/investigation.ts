@@ -23,6 +23,7 @@ export class InvestigationState {
       currentBatch: 0,
       nodes: {},
       pendingProposals: {},
+      usedAgentIds: {},
       createdAt: now,
       updatedAt: now,
     };
@@ -39,6 +40,10 @@ export class InvestigationState {
       const data = JSON.parse(content) as Investigation;
       if (!data.pendingProposals) {
         data.pendingProposals = {};
+      }
+      // Migration: add usedAgentIds if missing
+      if (!data.usedAgentIds) {
+        data.usedAgentIds = {};
       }
       return new InvestigationState(data, persistDir);
     } catch {

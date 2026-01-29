@@ -93,28 +93,44 @@ export async function handleCommit(input: CommitInput, persistDir: string = "./i
       }
     }
     if (!result.agentId) {
-      warnings.push(`⚠️ WARNING [MISSING_AGENT]: ${result.nodeId} has no agentId. Provide agentId from Task tool.`);
-    } else if (state.data.projectDir) {
-      // Verify agent exists in Claude Code session files
-      const verification = verifyAgent(result.agentId, state.data.projectDir);
-      if (!verification.valid) {
+      errors.push({
+        nodeId: result.nodeId,
+        error: "MISSING_AGENT",
+        message: `🚨 MISSING_AGENT: ${result.nodeId} has no agentId. You MUST spawn a Task agent.`,
+        suggestion: "Spawn a Task agent and use its agentId in the commit",
+      });
+    } else {
+      // Check for agentId reuse within this session
+      const previousNode = state.data.usedAgentIds[result.agentId];
+      if (previousNode && previousNode !== result.nodeId) {
         errors.push({
           nodeId: result.nodeId,
-          error: "FAKE_AGENT",
-          message: `🚨 FAKE_AGENT: ${verification.reason}`,
-          suggestion: "Spawn a real Task agent and use its agentId",
+          error: "REUSED_AGENT",
+          message: `🚨 REUSED_AGENT: agentId ${result.agentId} was already used for node ${previousNode}. Each node requires a NEW Task agent.`,
+          suggestion: "Spawn a fresh Task agent for each node - do not reuse agentIds",
         });
-      } else if (verification.reason) {
-        // Valid but with a warning (e.g., couldn't find sessions to verify)
-        warnings.push(`⚠️ WARNING [UNVERIFIED_AGENT]: ${result.nodeId} - ${verification.reason}`);
+      } else if (state.data.projectDir) {
+        // Verify agent exists in Claude Code session files
+        const verification = verifyAgent(result.agentId, state.data.projectDir);
+        if (!verification.valid) {
+          errors.push({
+            nodeId: result.nodeId,
+            error: "FAKE_AGENT",
+            message: `🚨 FAKE_AGENT: ${verification.reason}`,
+            suggestion: "Spawn a real Task agent and use its agentId",
+          });
+        } else if (verification.reason) {
+          // Valid but with a warning (e.g., couldn't find sessions to verify)
+          warnings.push(`⚠️ WARNING [UNVERIFIED_AGENT]: ${result.nodeId} - ${verification.reason}`);
+        }
       }
     }
   }
 
-  // If any FAKE_AGENT errors, reject the commit
-  if (errors.some((e) => e.error === "FAKE_AGENT")) {
+  // If any FAKE_AGENT, REUSED_AGENT, or MISSING_AGENT errors, reject the commit
+  if (errors.some((e) => e.error === "FAKE_AGENT" || e.error === "REUSED_AGENT" || e.error === "MISSING_AGENT")) {
     return {
-      message: "🚫 REJECTED: Fake agent(s) detected. You must spawn real Task agents.",
+      message: "🚫 REJECTED: Agent validation failed. Each node requires a fresh, real Task agent.",
       status: "REJECTED",
       errors,
       warnings,
@@ -122,6 +138,13 @@ export async function handleCommit(input: CommitInput, persistDir: string = "./i
       canEnd: false,
       pendingExplore: [],
     };
+  }
+
+  // Track used agentIds to prevent reuse
+  for (const result of input.results) {
+    if (result.agentId) {
+      state.data.usedAgentIds[result.agentId] = result.nodeId;
+    }
   }
 
   // Depth enforcement: FOUND only allowed at Round 4+
