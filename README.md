@@ -41,17 +41,23 @@ Add to your Claude Code MCP settings (`~/.claude/settings.json`):
 
 ## State Machine
 
-| State   | Meaning              | Children Required | Terminal | Min Round |
-|---------|----------------------|-------------------|----------|-----------|
-| EXPLORE | Dig deeper           | 2+ any            | No       | R1        |
-| FOUND   | Provisional solution | 2+ VERIFY         | No       | R4        |
-| VERIFY  | Confirms FOUND       | 0                 | Yes      | R5        |
-| EXHAUST | Exhausted path       | 1+ DEAD           | No       | R3        |
-| DEAD    | Confirmed dead end   | 0                 | Yes      | R4        |
+| State   | Meaning              | Children Required    | Terminal | Min Round | Valid Child States |
+|---------|----------------------|----------------------|----------|-----------|-------------------|
+| EXPLORE | Dig deeper           | 2+ (R1-R2), 1+ (R3+) | No       | R1        | Any |
+| FOUND   | Provisional solution | 1+ any               | No       | R4        | EXPLORE, FOUND, VERIFY |
+| VERIFY  | Confirms FOUND       | 0                    | Yes      | R4        | - |
+| EXHAUST | Exhausted path       | 1+ any               | No       | R4        | EXPLORE, EXHAUST, DEAD |
+| DEAD    | Confirmed dead end   | 0                    | Yes      | R4        | - |
 
-**Key insight:** FOUND is NOT terminal. Every promising finding must be verified by 2+ VERIFY children before the investigation can end.
+**Key insight:** FOUND is NOT terminal. Every promising finding must be verified by at least one child before the investigation can end.
 
-**Key insight:** EXHAUST is NOT terminal. Every exhausted path must be confirmed by 1+ DEAD children.
+**Key insight:** EXHAUST is NOT terminal. Every exhausted path must be confirmed by at least one child.
+
+**Invalid Transitions (Semantic Conflicts):**
+| From | Cannot Go To | Why |
+|------|--------------|-----|
+| FOUND | EXHAUST, DEAD | Found something - can't be exhausted/dead |
+| EXHAUST | FOUND, VERIFY | Exhausted path - can't suddenly find/verify |
 
 ## Workflow (Single Root Paradigm)
 
@@ -77,13 +83,15 @@ Round 5: R5.A1a1a (parent: R4.A1a1) - VERIFY node
 
 ## Rules
 
-1. **Single root R1.A** - Then branch wide at R2
+1. **Single root R1.A** - Then branch wide at R2 (5+ nodes recommended)
 2. **Minimum 5 rounds** - Cannot end before Round 5
-3. **EXPLORE needs 2+ children** - Must branch for thorough coverage
-4. **FOUND only at R4+** - Earlier rounds auto-convert to EXPLORE
-5. **FOUND needs 2+ VERIFY** - Cannot end until findings are verified twice
-6. **EXHAUST only at R3+** - Earlier rounds auto-convert to EXPLORE
-7. **DEAD only at R4+** - R1-R2 converts to EXPLORE, R3 converts to EXHAUST
+3. **EXPLORE needs 2+ children at R1-R2, 1+ at R3+** - Relaxed requirements later
+4. **R3 must be EXPLORE only** - Forces deeper investigation before conclusions
+5. **FOUND only at R4+** - Earlier rounds auto-convert to EXPLORE
+6. **FOUND needs 1+ child** (EXPLORE, FOUND, or VERIFY) - Cannot end until verified
+7. **EXHAUST only at R4+** - Earlier rounds auto-convert to EXPLORE
+8. **EXHAUST needs 1+ child** (EXPLORE, EXHAUST, or DEAD) - Cannot end unconfirmed
+9. **DEAD only at R4+** - R1-R3 converts to EXPLORE
 
 ## Example
 
