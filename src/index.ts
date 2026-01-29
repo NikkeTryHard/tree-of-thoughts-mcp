@@ -17,9 +17,10 @@ server.tool(
   "Start investigation with single root. Returns sessionId.",
   {
     query: z.string().describe("The problem to investigate"),
+    projectDir: z.string().describe("Current working directory (from pwd). Used to verify agent files exist."),
   },
   async (input) => {
-    const result = await handleStart({ query: input.query }, PERSIST_DIR);
+    const result = await handleStart({ query: input.query, projectDir: input.projectDir }, PERSIST_DIR);
     return {
       content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
     };

@@ -20,7 +20,25 @@ description: Multi-path investigation with parallel agents
 
 - Commits within 10 seconds of propose trigger SUSPICIOUS warnings
 - Missing agentId triggers MISSING_AGENT warnings
+- **Fake agentIds are REJECTED** - verified against ~/.claude/projects/
 - Fabricating findings without research is PROHIBITED
+
+## Agent Verification
+
+**agentIds are verified against Claude Code's session files.**
+
+When calling tot_start, you MUST provide your project directory:
+```javascript
+tot_start({
+  query: "...",
+  projectDir: "/home/user/myproject"  // REQUIRED: Run `pwd` to get this
+})
+```
+
+When you spawn a Task agent, you get an agentId (e.g., `a977616`).
+tot_commit will verify this agent file exists in ~/.claude/projects/.
+
+**Fake agentIds will be REJECTED.** You cannot fabricate agent IDs.
 
 ## Workflow (Single Root Paradigm)
 
@@ -89,8 +107,8 @@ Format:
 ## Example
 
 ```javascript
-// Start
-tot_start({ query: "..." })
+// Start - MUST include projectDir
+tot_start({ query: "...", projectDir: "/home/user/myproject" })
 
 // Round 1: Single root
 tot_propose({ sessionId, nodes: [
@@ -135,11 +153,18 @@ tot_end({ sessionId })
 
 ## Warnings (Anti-Gaming)
 
-| Warning        | Meaning                                             |
-| -------------- | --------------------------------------------------- |
-| SUSPICIOUS     | Commit too fast after propose - no real research    |
-| MISSING_AGENT  | No agentId provided - cannot verify research        |
-| DEPTH_ENFORCED | FOUND before R4 converted to EXPLORE - add children |
+| Warning          | Meaning                                             |
+| ---------------- | --------------------------------------------------- |
+| SUSPICIOUS       | Commit too fast after propose - no real research    |
+| MISSING_AGENT    | No agentId provided - cannot verify research        |
+| DEPTH_ENFORCED   | FOUND before R4 converted to EXPLORE - add children |
+| UNVERIFIED_AGENT | Could not verify agentId (no sessions found)        |
+
+## Errors (Rejection)
+
+| Error       | Meaning                                     |
+| ----------- | ------------------------------------------- |
+| FAKE_AGENT  | agentId not found in Claude Code sessions   |
 
 ## CRITICAL: EXPLORE Nodes Need 2+ Children
 
