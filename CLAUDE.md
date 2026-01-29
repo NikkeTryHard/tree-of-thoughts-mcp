@@ -43,3 +43,18 @@ npm run build         # Build to dist/
 - Branch into 3-5 children at R2
 - FOUND only allowed at R4+
 - Minimum 5 rounds before ending
+
+## Skill File Sync
+
+**Keep these two files in sync:**
+- Project: `tree-of-thoughts/SKILL.md`
+- Local: `~/.claude/skills/tree-of-thoughts/SKILL.md`
+
+When editing either file, copy to the other location:
+```bash
+# After editing project file:
+cp tree-of-thoughts/SKILL.md ~/.claude/skills/tree-of-thoughts/SKILL.md
+
+# After editing local file:
+cp ~/.claude/skills/tree-of-thoughts/SKILL.md tree-of-thoughts/SKILL.md
+```
