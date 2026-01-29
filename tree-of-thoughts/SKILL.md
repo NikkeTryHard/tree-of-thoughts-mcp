@@ -17,7 +17,7 @@ description: Multi-path investigation with parallel agents. Use when researching
 
 ## CRITICAL: Agent Spawning is MANDATORY
 
-**You MUST spawn a FRESH Task agent for EVERY proposed node.** The MCP tracks timing and agentId.
+**You MUST spawn a FRESH Haiku Task agent for EVERY proposed node.** The MCP tracks timing and agentId.
 
 | Violation | Result |
 |-----------|--------|
@@ -26,7 +26,9 @@ description: Multi-path investigation with parallel agents. Use when researching
 | Fake agentId | **REJECTED** - verified against ~/.claude/projects/ |
 | Commit < 10s after propose | WARNING - looks like gaming |
 
-**Each node = One fresh Task agent. No exceptions. No reuse.**
+**Each node = One fresh Haiku Task agent. No exceptions. No reuse.**
+
+**ALWAYS use model: haiku** - Tree of Thoughts is a research protocol, not implementation. Haiku agents are faster, cheaper, and sufficient for investigation tasks.
 
 ## Agent Verification
 
