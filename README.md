@@ -5,7 +5,7 @@ A Model Context Protocol (MCP) server that enables structured multi-path investi
 ## Features
 
 - **Single Root Paradigm** - Start with one root, branch wide at R2
-- **4-State System** - EXPLORE, FOUND, VERIFY, DEAD states enforce thorough investigation
+- **5-State System** - EXPLORE, FOUND, VERIFY, EXHAUST, DEAD states enforce thorough investigation
 - **Anti-Gaming Measures** - Timing checks and agentId tracking prevent shortcut-taking
 - **Reference Extraction** - Automatically collects URLs and file paths from findings
 - **DOT Graph Output** - Visualize investigation tree structure
@@ -41,14 +41,17 @@ Add to your Claude Code MCP settings (`~/.claude/settings.json`):
 
 ## State Machine
 
-| State   | Meaning              | Children Required | Terminal |
-|---------|----------------------|-------------------|----------|
-| EXPLORE | Dig deeper           | 2+                | No       |
-| FOUND   | Provisional solution | 1+ VERIFY         | No       |
-| VERIFY  | Confirms FOUND       | 0                 | Yes      |
-| DEAD    | Dead end             | 0                 | Yes      |
+| State   | Meaning              | Children Required | Terminal | Min Round |
+|---------|----------------------|-------------------|----------|-----------|
+| EXPLORE | Dig deeper           | 2+ any            | No       | R1        |
+| FOUND   | Provisional solution | 2+ VERIFY         | No       | R4        |
+| VERIFY  | Confirms FOUND       | 0                 | Yes      | R5        |
+| EXHAUST | Exhausted path       | 1+ DEAD           | No       | R3        |
+| DEAD    | Confirmed dead end   | 0                 | Yes      | R4        |
 
-**Key insight:** FOUND is NOT terminal. Every promising finding must be verified before the investigation can end.
+**Key insight:** FOUND is NOT terminal. Every promising finding must be verified by 2+ VERIFY children before the investigation can end.
+
+**Key insight:** EXHAUST is NOT terminal. Every exhausted path must be confirmed by 1+ DEAD children.
 
 ## Workflow (Single Root Paradigm)
 
@@ -78,7 +81,9 @@ Round 5: R5.A1a1a (parent: R4.A1a1) - VERIFY node
 2. **Minimum 5 rounds** - Cannot end before Round 5
 3. **EXPLORE needs 2+ children** - Must branch for thorough coverage
 4. **FOUND only at R4+** - Earlier rounds auto-convert to EXPLORE
-5. **FOUND needs VERIFY** - Cannot end until findings are verified
+5. **FOUND needs 2+ VERIFY** - Cannot end until findings are verified twice
+6. **EXHAUST only at R3+** - Earlier rounds auto-convert to EXPLORE
+7. **DEAD only at R4+** - R1-R2 converts to EXPLORE, R3 converts to EXHAUST
 
 ## Example
 
