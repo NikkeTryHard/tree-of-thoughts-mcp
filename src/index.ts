@@ -136,7 +136,7 @@ server.tool(
 // tot_next - Generate agent-friendly next steps
 server.tool(
   "tot_next",
-  "Agent-friendly orchestration helper. Call after tot_start and after every commit. It returns nextCall, canEndReason, ready-to-use proposePayload, generated task prompts, commit skeletons, current JSON/DOT graph, and optional combination coverage. mode=smoke defaults minRounds=2 and suppresses breadth warnings; mode=deep is normal; mode=exhaustive maximizes breadth/combinations.",
+  "Agent-friendly orchestration helper. Call after tot_start and after every commit. It returns nextCall, canEndReason, ready-to-use proposePayload, generated task prompts, commit skeletons, current JSON/DOT graph, and optional combination coverage. mode=smoke defaults minRounds=2 and suppresses breadth warnings; mode=deep is normal; mode=exhaustive maximizes breadth/combinations. For deep/exhaustive investigations, run at least one returned node with a subagent; use multiple subagents when tasks are independent.",
   {
     sessionId: z.string().describe("Session ID"),
     strategy: z.enum(["balanced", "exhaustive", "verify", "deepen"]).default("balanced").describe("balanced=small valid batch, exhaustive=more breadth/combinations, verify=prioritize FOUND verification, deepen=extend active paths"),
@@ -156,7 +156,7 @@ server.tool(
 // tot_step - Consolidated driver
 server.tool(
   "tot_step",
-  "Preferred compact driver. With no results, returns next tasks. With results, auto-proposes missing nodes, commits observed results, and returns the next action. Use graphMode=summary and verbosity=compact for token-efficient agent loops. Low-level tot_propose/tot_commit/tot_status remain advanced/debug tools.",
+  "Preferred compact driver. With no results, returns next tasks. With results, auto-proposes missing nodes, commits observed results, and returns the next action. Use graphMode=summary and verbosity=compact for token-efficient agent loops. For non-smoke work, delegate at least one node to a subagent, and use two or more subagents for independent branches. Low-level tot_propose/tot_commit/tot_status remain advanced/debug tools.",
   {
     sessionId: z.string().describe("Session ID"),
     results: z.array(z.object({

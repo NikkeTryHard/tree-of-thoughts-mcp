@@ -48,6 +48,7 @@ Agent output contract:
 - Commit only observed work.
 - Findings should include Summary, Evidence, Decision, Confidence, Risks, and ## References bullets.
 - Never fabricate sources, files, tests, outcomes, or trace IDs.
+- For non-smoke investigations, delegate at least one returned node to a subagent. For independent branches, use two or more subagents when available.
 
 Compact loop:
 1. Call tot_step({ sessionId }).

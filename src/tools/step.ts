@@ -45,6 +45,7 @@ export interface StepResult {
   tasks: CompactTask[];
   canEnd: boolean;
   pending: CompactPending[];
+  subagentPolicy?: string;
   message?: string;
   graph?: unknown;
   proposed?: ProposeResult;
@@ -151,6 +152,7 @@ function compactStep(status: StepResult["status"], message: string, next: NextRe
     tasks: compactTasks(next.tasks),
     canEnd: next.canEnd,
     pending: compactPending(committed),
+    subagentPolicy: "For non-smoke investigations, delegate at least one returned node to a subagent. Use multiple subagents for independent branches when available.",
     ...(message ? { message } : {}),
     ...(input.graphMode === "none" ? {} : { graph: shapeGraph(next, input.graphMode) }),
   };

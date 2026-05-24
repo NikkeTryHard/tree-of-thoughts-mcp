@@ -298,7 +298,7 @@ function buildResult(sessionId: string, message: string, nextCall: NextResult["n
     } : undefined,
     instructions: [
       "Use proposePayload exactly for tot_propose when nextCall is tot_propose.",
-      "Run each returned task with subagents when useful; main-agent commits are allowed when you did the work directly.",
+      "Run each returned task; for non-smoke investigations delegate at least one node to a subagent, and use multiple subagents for independent branches when available.",
       "Each agent prompt must demand evidence, confidence, risks, and a ## References section.",
       "Commit only observed findings. Do not fabricate references, files, tests, outcomes, or trace IDs.",
       "Call tot_next after each commit batch; call tot_end only when tot_next says nextCall=tot_end.",
