@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { InvestigationState } from "../state/investigation";
-import { Validator } from "../state/validation";
+import { Validator, getIncompleteNonTerminalNodes, formatIncompleteSummary, type IncompleteNode } from "../state/validation";
 import { DotGenerator } from "../state/dot-generator";
-import { NodeState, isTerminalState, getRequiredChildren } from "../types";
+import { NodeState, isTerminalState } from "../types";
 
 export const statusInputSchema = z.object({
   sessionId: z.string().describe("The investigation session ID"),
@@ -21,6 +21,8 @@ export interface StatusResult {
   pendingChildren: number;
   canEnd: boolean;
   endBlocker?: string;
+  canEndReason?: string;
+  pendingNonTerminal: IncompleteNode[];
   dot: string;
   nextAction: string;
 }
@@ -38,6 +40,8 @@ export async function handleStatus(input: StatusInput, persistDir: string = "./i
       activeExplore: 0,
       terminalNodes: 0,
       pendingChildren: 0,
+      pendingNonTerminal: [],
+      canEndReason: "Session not found",
       canEnd: false,
       endBlocker: "Session not found",
       dot: "",
@@ -49,19 +53,15 @@ export async function handleStatus(input: StatusInput, persistDir: string = "./i
   const exploreNodes = allNodes.filter((n) => n.state === NodeState.EXPLORE);
   const terminalNodes = allNodes.filter((n) => isTerminalState(n.state));
 
-  // Calculate pending children needed
-  let pendingChildren = 0;
-  for (const node of exploreNodes) {
-    const required = getRequiredChildren(node.state);
-    const existing = node.children.length;
-    pendingChildren += Math.max(0, required - existing);
-  }
+  const pendingNonTerminal = getIncompleteNonTerminalNodes(state);
+  const pendingChildren = pendingNonTerminal.reduce((sum, node) => sum + Math.max(0, node.needs - node.has), 0);
 
   const canEndResult = Validator.canEndInvestigation(state);
+  const pendingSummary = formatIncompleteSummary(pendingNonTerminal);
 
   let nextAction: string;
   if (pendingChildren > 0) {
-    nextAction = `Propose ${pendingChildren} more children for EXPLORE nodes`;
+    nextAction = `Propose ${pendingChildren} pending children: ${pendingSummary}`;
   } else if (!canEndResult.canEnd) {
     nextAction = canEndResult.reason || "Continue investigation";
   } else {
@@ -79,6 +79,8 @@ export async function handleStatus(input: StatusInput, persistDir: string = "./i
     terminalNodes: terminalNodes.length,
     pendingChildren,
     canEnd: canEndResult.canEnd,
+    canEndReason: canEndResult.reason,
+    pendingNonTerminal,
     endBlocker: canEndResult.reason,
     dot: DotGenerator.generate(state),
   };

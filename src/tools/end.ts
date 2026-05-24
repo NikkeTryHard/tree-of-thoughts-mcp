@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { InvestigationState } from "../state/investigation";
 import { Validator } from "../state/validation";
-import { DotGenerator } from "../state/dot-generator";
+import { persistGraph, type TotGraph } from "../state/graph";
 import { NodeState, type ToTNode } from "../types";
 
 function extractReferences(nodes: ToTNode[]): string[] {
@@ -33,6 +33,7 @@ function extractReferences(nodes: ToTNode[]): string[] {
 
 export const endInputSchema = z.object({
   sessionId: z.string().describe("The investigation session ID"),
+  minRounds: z.number().int().min(1).max(20).optional().describe("Optional minimum round override for smoke tests; default is 5."),
 });
 
 export type EndInput = z.infer<typeof endInputSchema>;
@@ -56,11 +57,24 @@ export interface EndResult {
   solutions: NodeSummary[];
   deadEnds: number;
   references: string[];
+  graph: TotGraph;
+  graphPath: string;
+  dotPath: string;
+  minRounds: number;
 }
 
-export async function handleEnd(input: EndInput, persistDir: string = "./investigations"): Promise<EndResult> {
+export async function handleEnd(input: EndInput, persistDir: string = "./investigations", graphDir: string = persistDir): Promise<EndResult> {
   const state = InvestigationState.load(input.sessionId, persistDir);
 
+  const emptyGraph: TotGraph = {
+    sessionId: input.sessionId,
+    query: "",
+    currentRound: 0,
+    totalNodes: 0,
+    nodes: [],
+    edges: [],
+    dot: "",
+  };
   if (!state) {
     return {
       status: "REJECTED",
@@ -73,24 +87,34 @@ export async function handleEnd(input: EndInput, persistDir: string = "./investi
       solutions: [],
       deadEnds: 0,
       references: [],
+      graph: emptyGraph,
+      graphPath: "",
+      dotPath: "",
+      minRounds: input.minRounds ?? 5,
     };
   }
 
-  const canEndResult = Validator.canEndInvestigation(state);
+  const minRounds = input.minRounds ?? state.data.minRounds ?? 5;
+  const canEndResult = Validator.canEndInvestigation(state, minRounds);
+  const persisted = persistGraph(state, graphDir);
 
   if (!canEndResult.canEnd) {
     return {
-      message: `🚫 REJECTED: Cannot end investigation. ${canEndResult.reason}. Fix this before calling tot_end again.`,
+      message: `[REJECTED] Cannot end investigation. ${canEndResult.reason}. Fix this before calling tot_end again.`,
       status: "REJECTED",
       reason: canEndResult.reason,
       sessionId: state.data.sessionId,
       query: state.data.query,
       totalRounds: state.data.currentRound,
       totalNodes: state.getAllNodes().length,
-      finalDot: DotGenerator.generate(state),
+      finalDot: persisted.graph.dot,
+      graph: persisted.graph,
+      graphPath: persisted.graphPath,
+      dotPath: persisted.dotPath,
       solutions: [],
       deadEnds: 0,
       references: [],
+      minRounds,
     };
   }
 
@@ -109,7 +133,7 @@ export async function handleEnd(input: EndInput, persistDir: string = "./investi
   const deadEnds = allNodes.filter((n) => n.state === NodeState.DEAD).length;
 
   return {
-    message: `Investigation complete. ${solutions.length} solutions found, ${deadEnds} dead ends.`,
+    message: `Investigation complete. ${solutions.length} solutions found, ${deadEnds} dead ends. Graph saved to ${persisted.graphPath}`,
     status: "OK",
     sessionId: state.data.sessionId,
     query: state.data.query,
@@ -118,6 +142,10 @@ export async function handleEnd(input: EndInput, persistDir: string = "./investi
     solutions,
     deadEnds,
     references,
-    finalDot: DotGenerator.generate(state),
+    finalDot: persisted.graph.dot,
+    graph: persisted.graph,
+    graphPath: persisted.graphPath,
+    dotPath: persisted.dotPath,
+    minRounds,
   };
 }

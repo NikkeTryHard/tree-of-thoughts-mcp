@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { rmSync, mkdirSync } from "fs";
-import { Validator, getIncompleteExploreNodes } from "./validation";
+import { Validator, getIncompleteExploreNodes, getIncompleteNonTerminalNodes, formatIncompleteSummary } from "./validation";
 import { InvestigationState } from "./investigation";
 import { NodeState } from "../types";
 
@@ -164,6 +164,34 @@ describe("getIncompleteExploreNodes", () => {
 
     const incomplete = getIncompleteExploreNodes(state);
     expect(incomplete).toEqual([{ nodeId: "R1.D", has: 0, needs: 1 }]);
+  });
+
+  test("labels FOUND and EXHAUST child requirements", () => {
+    const state = InvestigationState.create("Test query", 1, TEST_DIR);
+
+    state.addNode({
+      id: "R4.F",
+      parent: null,
+      state: NodeState.FOUND,
+      title: "Found",
+      findings: "Solution",
+      children: [],
+      round: 4,
+    });
+    state.addNode({
+      id: "R4.X",
+      parent: null,
+      state: NodeState.EXHAUST,
+      title: "Exhausted",
+      findings: "No path",
+      children: [],
+      round: 4,
+    });
+
+    const incomplete = getIncompleteNonTerminalNodes(state);
+    expect(incomplete).toContainEqual({ nodeId: "R4.F", state: NodeState.FOUND, has: 0, needs: 1, requiredChildState: NodeState.VERIFY, childLabel: "VERIFY" });
+    expect(incomplete).toContainEqual({ nodeId: "R4.X", state: NodeState.EXHAUST, has: 0, needs: 1, requiredChildState: NodeState.DEAD, childLabel: "DEAD" });
+    expect(formatIncompleteSummary(incomplete)).toBe("1 FOUND nodes need VERIFY, 1 EXHAUST nodes need DEAD");
   });
 
   test("returns multiple incomplete EXPLORE nodes", () => {

@@ -82,6 +82,30 @@ describe("R2 breadth warning", () => {
     expect(result.warnings.some(w => w.includes("3 nodes"))).toBe(true);
   });
 
+  it("suppresses R2 breadth warning for smoke paths", async () => {
+    const start = await handleStart({ query: "Test" }, TEST_DIR);
+
+    await handlePropose({
+      sessionId: start.sessionId,
+      nodes: [{ id: "R1.A", parent: null, title: "Root", plannedAction: "Test" }],
+    }, TEST_DIR);
+    await handleCommit({
+      sessionId: start.sessionId,
+      minRounds: 2,
+      results: [{ nodeId: "R1.A", state: NodeState.EXPLORE, findings: "x" }],
+    }, TEST_DIR);
+
+    const result = await handlePropose({
+      sessionId: start.sessionId,
+      suppressBreadthWarnings: true,
+      nodes: [{ id: "R2.Aa", parent: "R1.A", title: "Verify", plannedAction: "Verify" }],
+    }, TEST_DIR);
+
+    expect(result.status).toBe("OK");
+    expect(result.warnings.some(w => w.includes("R2_BREADTH"))).toBe(false);
+    expect(result.nextCommitDefaults).toEqual({ minRounds: 2, allowEarlyTerminal: true });
+  });
+
   it("no warning when R2 has 5+ nodes", async () => {
     const start = await handleStart({ query: "Test" }, TEST_DIR);
 
@@ -153,5 +177,32 @@ describe("R2 breadth warning", () => {
 
     expect(result.status).toBe("OK");
     expect(result.warnings.some(w => w.includes("R2_BREADTH"))).toBe(false);
+  });
+});
+
+describe("node titles", () => {
+  beforeEach(() => {
+    if (fs.existsSync(TEST_DIR)) {
+      fs.rmSync(TEST_DIR, { recursive: true });
+    }
+    fs.mkdirSync(TEST_DIR, { recursive: true });
+  });
+
+  afterEach(() => {
+    if (fs.existsSync(TEST_DIR)) {
+      fs.rmSync(TEST_DIR, { recursive: true });
+    }
+  });
+
+  it("rejects nodes without a non-empty title", async () => {
+    const start = await handleStart({ query: "Test" }, TEST_DIR);
+
+    const result = await handlePropose({
+      sessionId: start.sessionId,
+      nodes: [{ id: "R1.A", parent: null, title: "   ", plannedAction: "Test" }],
+    }, TEST_DIR);
+
+    expect(result.status).toBe("REJECTED");
+    expect(result.errors.some((error) => error.error === "MISSING_TITLE")).toBe(true);
   });
 });

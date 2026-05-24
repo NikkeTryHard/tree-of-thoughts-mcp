@@ -1,8 +1,7 @@
 import { z } from "zod";
 import { InvestigationState } from "../state/investigation";
-import { Validator, getIncompleteExploreNodes } from "../state/validation";
+import { Validator, getIncompleteNonTerminalNodes, formatIncompleteSummary, type IncompleteNode } from "../state/validation";
 import { NodeState, type ValidationError, getValidChildStates } from "../types";
-import { verifyAgent } from "../utils/agent-verifier";
 
 const MIN_RESEARCH_TIME_MS = 10000; // 10 seconds minimum
 
@@ -22,10 +21,13 @@ export const commitInputSchema = z.object({
         nodeId: z.string().describe("The node ID that was executed"),
         state: z.nativeEnum(NodeState).describe("EXPLORE=dig deeper, FOUND=provisional (R4+, needs VERIFY), VERIFY=confirms FOUND, DEAD=dead end"),
         findings: z.string().describe("What the agent discovered"),
-        agentId: z.string().optional().describe("The Task agent ID that performed the research"),
+        agentId: z.string().optional().describe("Optional agent identifier for traceability only; it is not verified or required"),
       }),
     )
     .describe("Results from executed agents"),
+  minRounds: z.number().int().min(1).max(20).optional().describe("Optional minimum round override for canEnd. Use 2 or 3 for smoke tests; default is 5."),
+  allowEarlyTerminal: z.boolean().optional().describe("Allow FOUND/DEAD/EXHAUST before R4. Defaults true when minRounds is less than 4."),
+  suppressTimingWarnings: z.boolean().optional().describe("Suppress fast-commit warning for intentional auto-propose/commit paths."),
 });
 
 export type CommitInput = z.infer<typeof commitInputSchema>;
@@ -38,6 +40,10 @@ export interface CommitResult {
   canEnd: boolean;
   pendingExplore: string[];
   message: string;
+  canEndReason?: string;
+  pendingNonTerminal: IncompleteNode[];
+  pendingChildren: number;
+  minRounds: number;
 }
 
 export async function handleCommit(input: CommitInput, persistDir: string = "./investigations"): Promise<CommitResult> {
@@ -57,6 +63,10 @@ export async function handleCommit(input: CommitInput, persistDir: string = "./i
       currentRound: 0,
       canEnd: false,
       pendingExplore: [],
+      pendingNonTerminal: [],
+      pendingChildren: 0,
+      canEndReason: "Session not found",
+      minRounds: 5,
       message: "Session not found",
     };
   }
@@ -86,74 +96,28 @@ export async function handleCommit(input: CommitInput, persistDir: string = "./i
       currentRound: state.data.currentRound,
       canEnd: false,
       pendingExplore: [],
+      pendingNonTerminal: [],
+      pendingChildren: 0,
+      canEndReason: `Commit rejected: ${errors.length} error(s)`,
+      minRounds: input.minRounds ?? 5,
       message: `Commit rejected: ${errors.length} error(s)`,
     };
   }
 
-  // Anti-gaming checks: timing, agentId presence, and agent verification
+  // Timing is a soft nudge only. Agent ID verification is intentionally disabled:
+  // current harnesses expose different agent identifiers, and ToT should not block valid work on stale Claude-only session-file checks.
   for (const result of input.results) {
     const proposal = state.getPendingProposal(result.nodeId);
     if (proposal) {
       const elapsed = Date.now() - proposal.proposedAt;
-      if (elapsed < MIN_RESEARCH_TIME_MS) {
-        warnings.push(`⚠️ WARNING [SUSPICIOUS]: ${result.nodeId} committed ${Math.round(elapsed / 1000)}s after propose (min ${MIN_RESEARCH_TIME_MS / 1000}s). This looks like gaming.`);
-      }
-    }
-    if (!result.agentId) {
-      errors.push({
-        nodeId: result.nodeId,
-        error: "MISSING_AGENT",
-        message: `🚨 MISSING_AGENT: ${result.nodeId} has no agentId. You MUST spawn a Task agent.`,
-        suggestion: "Spawn a Task agent and use its agentId in the commit",
-      });
-    } else {
-      // Check for agentId reuse within this session
-      const previousNode = state.data.usedAgentIds[result.agentId];
-      if (previousNode && previousNode !== result.nodeId) {
-        errors.push({
-          nodeId: result.nodeId,
-          error: "REUSED_AGENT",
-          message: `🚨 REUSED_AGENT: agentId ${result.agentId} was already used for node ${previousNode}. Each node requires a NEW Task agent.`,
-          suggestion: "Spawn a fresh Task agent for each node - do not reuse agentIds",
-        });
-      } else if (state.data.projectDir) {
-        // Verify agent exists in Claude Code session files
-        const verification = verifyAgent(result.agentId, state.data.projectDir);
-        if (!verification.valid) {
-          errors.push({
-            nodeId: result.nodeId,
-            error: "FAKE_AGENT",
-            message: `🚨 FAKE_AGENT: ${verification.reason}`,
-            suggestion: "Spawn a real Task agent and use its agentId",
-          });
-        } else if (verification.reason) {
-          // Valid but with a warning (e.g., couldn't find sessions to verify)
-          warnings.push(`⚠️ WARNING [UNVERIFIED_AGENT]: ${result.nodeId} - ${verification.reason}`);
-        }
+      if (!input.suppressTimingWarnings && elapsed < MIN_RESEARCH_TIME_MS) {
+        warnings.push(`[WARNING:SUSPICIOUS] ${result.nodeId} committed ${Math.round(elapsed / 1000)}s after propose (min ${MIN_RESEARCH_TIME_MS / 1000}s). This may mean the node was not independently researched.`);
       }
     }
   }
 
-  // If any FAKE_AGENT, REUSED_AGENT, or MISSING_AGENT errors, reject the commit
-  if (errors.some((e) => e.error === "FAKE_AGENT" || e.error === "REUSED_AGENT" || e.error === "MISSING_AGENT")) {
-    return {
-      message: "🚫 REJECTED: Agent validation failed. Each node requires a fresh, real Task agent.",
-      status: "REJECTED",
-      errors,
-      warnings,
-      currentRound: state.data.currentRound,
-      canEnd: false,
-      pendingExplore: [],
-    };
-  }
-
-  // Track used agentIds to prevent reuse
-  for (const result of input.results) {
-    if (result.agentId) {
-      state.data.usedAgentIds[result.agentId] = result.nodeId;
-    }
-  }
-
+  const minRounds = input.minRounds ?? state.data.minRounds ?? 5;
+  const allowEarlyTerminal = input.allowEarlyTerminal ?? state.data.allowEarlyTerminal ?? minRounds < 4;
   // Depth enforcement constants
   const R3_EXPLORE_ONLY = 3;
   const MIN_ROUND_FOR_FOUND = 4;
@@ -165,26 +129,26 @@ export async function handleCommit(input: CommitInput, persistDir: string = "./i
     const round = extractRound(result.nodeId);
 
     // R3 EXPLORE-only rule first
-    if (round === R3_EXPLORE_ONLY && result.state !== NodeState.EXPLORE) {
-      warnings.push(`⚠️ WARNING [R3_EXPLORE_ONLY]: ${result.nodeId} converted ${result.state}→EXPLORE (R3 must be EXPLORE only).`);
+    if (!allowEarlyTerminal && round === R3_EXPLORE_ONLY && result.state !== NodeState.EXPLORE) {
+      warnings.push(`[WARNING:R3_EXPLORE_ONLY] ${result.nodeId} converted ${result.state}->EXPLORE (R3 must be EXPLORE only).`);
       return { ...result, state: NodeState.EXPLORE };
     }
 
     // FOUND only allowed at R4+
-    if (result.state === NodeState.FOUND && round < MIN_ROUND_FOR_FOUND) {
-      warnings.push(`⚠️ WARNING [DEPTH_ENFORCED]: ${result.nodeId} converted FOUND→EXPLORE (round ${round} < ${MIN_ROUND_FOR_FOUND}). You MUST add 2+ children.`);
+    if (!allowEarlyTerminal && result.state === NodeState.FOUND && round < MIN_ROUND_FOR_FOUND) {
+      warnings.push(`[WARNING:DEPTH_ENFORCED] ${result.nodeId} converted FOUND->EXPLORE (round ${round} < ${MIN_ROUND_FOR_FOUND}). You MUST add 2+ children.`);
       return { ...result, state: NodeState.EXPLORE };
     }
 
     // EXHAUST only allowed at R4+
-    if (result.state === NodeState.EXHAUST && round < MIN_ROUND_FOR_EXHAUST) {
-      warnings.push(`⚠️ WARNING [EXHAUST_ENFORCED]: ${result.nodeId} converted EXHAUST→EXPLORE (round ${round} < ${MIN_ROUND_FOR_EXHAUST}). You MUST add 2+ children.`);
+    if (!allowEarlyTerminal && result.state === NodeState.EXHAUST && round < MIN_ROUND_FOR_EXHAUST) {
+      warnings.push(`[WARNING:EXHAUST_ENFORCED] ${result.nodeId} converted EXHAUST->EXPLORE (round ${round} < ${MIN_ROUND_FOR_EXHAUST}). You MUST add 2+ children.`);
       return { ...result, state: NodeState.EXPLORE };
     }
 
     // DEAD only allowed at R4+
-    if (result.state === NodeState.DEAD && round < MIN_ROUND_FOR_DEAD) {
-      warnings.push(`⚠️ WARNING [DEAD_ENFORCED]: ${result.nodeId} converted DEAD→EXPLORE (round ${round} < ${MIN_ROUND_FOR_DEAD}). You MUST add 2+ children.`);
+    if (!allowEarlyTerminal && result.state === NodeState.DEAD && round < MIN_ROUND_FOR_DEAD) {
+      warnings.push(`[WARNING:DEAD_ENFORCED] ${result.nodeId} converted DEAD->EXPLORE (round ${round} < ${MIN_ROUND_FOR_DEAD}). You MUST add 2+ children.`);
       return { ...result, state: NodeState.EXPLORE };
     }
 
@@ -220,6 +184,10 @@ export async function handleCommit(input: CommitInput, persistDir: string = "./i
       currentRound: state.data.currentRound,
       canEnd: false,
       pendingExplore: [],
+      pendingNonTerminal: [],
+      pendingChildren: 0,
+      canEndReason: "Invalid child state transitions detected",
+      minRounds: input.minRounds ?? 5,
     };
   }
 
@@ -248,25 +216,35 @@ export async function handleCommit(input: CommitInput, persistDir: string = "./i
   state.data.currentRound = maxRound;
   state.data.currentBatch += 1;
 
+  state.data.minRounds = minRounds;
+  state.data.allowEarlyTerminal = allowEarlyTerminal;
   state.save();
 
   // Get incomplete nodes (EXPLORE, FOUND, EXHAUST that need more children)
-  const incompleteExplore = getIncompleteExploreNodes(state);
-  const pendingExplore = incompleteExplore.map(inc => inc.nodeId);
+  const relaxExploreChildren = minRounds < 4;
+  const pendingNonTerminal = getIncompleteNonTerminalNodes(state, false).filter((node) => !(relaxExploreChildren && node.state === NodeState.EXPLORE));
+  const pendingChildren = pendingNonTerminal.reduce((sum, node) => sum + Math.max(0, node.needs - node.has), 0);
+  const pendingExplore = minRounds < 4 ? [] : pendingNonTerminal.filter((node) => node.state === NodeState.EXPLORE).map((node) => node.nodeId);
 
-  // Add INCOMPLETE_EXPLORE warnings for nodes that need more children
-  for (const inc of incompleteExplore) {
-    warnings.push(`🚨 CRITICAL [INCOMPLETE_EXPLORE]: Node ${inc.nodeId} has ${inc.has} children but REQUIRES ${inc.needs}. You MUST propose more children for this node before calling tot_end.`);
+  for (const node of pendingNonTerminal) {
+    warnings.push(`[CRITICAL:INCOMPLETE_${node.state}] Node ${node.nodeId} is ${node.state} and has ${node.has} children but requires ${node.needs} ${node.childLabel}. You MUST propose ${node.childLabel} before calling tot_end.`);
   }
 
-  const canEndResult = Validator.canEndInvestigation(state);
+  const canEndResult = Validator.canEndInvestigation(state, minRounds, relaxExploreChildren);
+  const pendingSummary = formatIncompleteSummary(pendingNonTerminal);
+  const reason = pendingSummary || canEndResult.reason || "more investigation needed";
+  const continueMessage = `CONTINUE REQUIRED: ${reason.replace(/[.\s]+$/, "")}. Do NOT present results yet.`;
 
   return {
-    message: canEndResult.canEnd ? "Ready to end. Call tot_end." : `CONTINUE REQUIRED: ${pendingExplore.length} EXPLORE nodes need children. Do NOT present results yet.`,
+    message: canEndResult.canEnd ? "Ready to end. Call tot_end." : continueMessage,
     status: "OK",
     warnings,
     currentRound: state.data.currentRound,
     canEnd: canEndResult.canEnd,
+    canEndReason: canEndResult.reason,
+    pendingNonTerminal,
+    pendingChildren,
+    minRounds,
     pendingExplore,
     errors: [],
   };

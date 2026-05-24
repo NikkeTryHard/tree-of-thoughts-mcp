@@ -4,3 +4,5 @@ export { handleCommit, commitInputSchema, type CommitInput, type CommitResult } 
 export { handleReclassify, reclassifyInputSchema, type ReclassifyInput, type ReclassifyResult } from "./reclassify";
 export { handleStatus, statusInputSchema, type StatusInput, type StatusResult } from "./status";
 export { handleEnd, endInputSchema, type EndInput, type EndResult } from "./end";
+export { handleNext, nextInputSchema, type NextInput, type NextResult } from "./next";
+export { handleStep, stepInputSchema, type StepInput, type StepResult } from "./step";

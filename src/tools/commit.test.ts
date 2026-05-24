@@ -34,7 +34,8 @@ describe("anti-gaming: timing", () => {
   });
 });
 
-describe("anti-gaming: agentId", () => {
+
+describe("agentId trace metadata", () => {
   beforeEach(() => {
     mkdirSync(TEST_DIR, { recursive: true });
   });
@@ -43,7 +44,7 @@ describe("anti-gaming: agentId", () => {
     rmSync(TEST_DIR, { recursive: true, force: true });
   });
 
-  it("rejects MISSING_AGENT if no agentId provided", async () => {
+  it("accepts commits without agentId", async () => {
     const start = await handleStart({ query: "Test" }, TEST_DIR);
 
     await handlePropose({
@@ -51,17 +52,17 @@ describe("anti-gaming: agentId", () => {
       nodes: [{ id: "R1.A", parent: null, title: "Test", plannedAction: "Test" }],
     }, TEST_DIR);
 
-    // Commit without agentId - should be REJECTED
+    // agentId is optional trace metadata, not a blocker.
     const result = await handleCommit({
       sessionId: start.sessionId,
       results: [{ nodeId: "R1.A", state: NodeState.EXPLORE, findings: "Test" }],
     }, TEST_DIR);
 
-    expect(result.status).toBe("REJECTED");
-    expect(result.errors.some(e => e.error === "MISSING_AGENT")).toBe(true);
+    expect(result.status).toBe("OK");
+    expect(result.errors.some(e => e.error === "MISSING_AGENT")).toBe(false);
   });
 
-  it("rejects REUSED_AGENT if same agentId used twice", async () => {
+  it("accepts reused agentId", async () => {
     const start = await handleStart({ query: "Test" }, TEST_DIR);
 
     await handlePropose({
@@ -84,7 +85,7 @@ describe("anti-gaming: agentId", () => {
       ],
     }, TEST_DIR);
 
-    // Try to reuse the same agentId - should be REJECTED
+    // Reuse is allowed because agentId is trace metadata only.
     const result = await handleCommit({
       sessionId: start.sessionId,
       results: [
@@ -93,8 +94,8 @@ describe("anti-gaming: agentId", () => {
       ],
     }, TEST_DIR);
 
-    expect(result.status).toBe("REJECTED");
-    expect(result.errors.some(e => e.error === "REUSED_AGENT")).toBe(true);
+    expect(result.status).toBe("OK");
+    expect(result.errors.some(e => e.error === "REUSED_AGENT")).toBe(false);
   });
 
   it("no warning if agentId provided", async () => {
@@ -466,7 +467,7 @@ describe("depth enforcement", () => {
     );
 
     expect(result.status).toBe("OK");
-    expect(result.warnings.some((w) => w.includes("DEAD_ENFORCED") && w.includes("DEAD→EXPLORE"))).toBe(true);
+    expect(result.warnings.some((w) => w.includes("DEAD_ENFORCED") && w.includes("DEAD->EXPLORE"))).toBe(true);
     expect(result.pendingExplore).toContain("R2.A1");
   });
 
@@ -695,7 +696,8 @@ describe("FOUND requires VERIFY", () => {
     );
 
     // FOUND should need 1 VERIFY child now
-    expect(result1.pendingExplore).toContain("R4.A1a1");
+    expect(result1.pendingExplore).not.toContain("R4.A1a1");
+    expect(result1.pendingNonTerminal.map((node) => node.nodeId)).toContain("R4.A1a1");
     expect(result1.canEnd).toBe(false);
 
     // Add first VERIFY child - now complete (only needs 1)
@@ -752,7 +754,7 @@ describe("depth enforcement at R1", () => {
     );
 
     expect(result.status).toBe("OK");
-    expect(result.warnings.some((w) => w.includes("DEAD_ENFORCED") && w.includes("DEAD→EXPLORE"))).toBe(true);
+    expect(result.warnings.some((w) => w.includes("DEAD_ENFORCED") && w.includes("DEAD->EXPLORE"))).toBe(true);
     expect(result.pendingExplore).toContain("R1.A");
   });
 });
@@ -1055,7 +1057,8 @@ describe("VERIFY parent validation", () => {
     );
 
     // FOUND node needs VERIFY children
-    expect(result.pendingExplore).toContain("R4.A1a1");
+    expect(result.pendingExplore).not.toContain("R4.A1a1");
+    expect(result.pendingNonTerminal.map((node) => node.nodeId)).toContain("R4.A1a1");
     expect(result.canEnd).toBe(false);
   });
 });

@@ -69,19 +69,22 @@ export interface CommitResultInput {
   nodeId: string;
   state: NodeState;
   findings: string;
-  agentId?: string; // Optional but warned if missing
+  agentId?: string; // Optional trace metadata only
 }
 
 export interface Investigation {
   sessionId: string;
   query: string;
-  projectDir: string; // For agent verification
+  projectDir: string; // Optional context retained for compatibility
   minRoots: number;
+  mode?: "smoke" | "deep" | "exhaustive";
+  minRounds?: number;
+  allowEarlyTerminal?: boolean;
   currentRound: number;
   currentBatch: number;
   nodes: Record<string, ToTNode>;
   pendingProposals: Record<string, ProposedNode>;
-  usedAgentIds: Record<string, string>; // agentId -> nodeId mapping to prevent reuse
+  usedAgentIds: Record<string, string>; // Deprecated compatibility field
   createdAt: string;
   updatedAt: string;
 }

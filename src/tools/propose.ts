@@ -10,11 +10,12 @@ export const proposeInputSchema = z.object({
       z.object({
         id: z.string().describe("Node ID in format R[round].[id]"),
         parent: z.string().nullable().describe("Parent node ID or null for roots"),
-        title: z.string().describe("Short title describing this node's focus"),
+        title: z.string().trim().min(1).describe("Required short human-readable node name for graph labels and final output"),
         plannedAction: z.string().describe("What the agent will investigate"),
       }),
     )
     .describe("Array of proposed nodes"),
+  suppressBreadthWarnings: z.boolean().optional().describe("Suppress R2 breadth warning for smoke/minRounds paths."),
 });
 
 export type ProposeInput = z.infer<typeof proposeInputSchema>;
@@ -25,6 +26,7 @@ export interface ProposeResult {
   warnings: string[];
   approvedNodes: string[];
   message: string;
+  nextCommitDefaults?: { minRounds?: number; allowEarlyTerminal?: boolean };
 }
 
 const R2_MIN_NODES = 5;
@@ -77,8 +79,8 @@ export async function handlePropose(input: ProposeInput, persistDir: string = ".
   const existingR2Nodes = state.getAllNodes().filter(n => n.id.startsWith("R2."));
   const totalR2 = r2NodesInBatch.length + existingR2Nodes.length;
 
-  if (r2NodesInBatch.length > 0 && totalR2 < R2_MIN_NODES) {
-    warnings.push(`⚠️ WARNING [R2_BREADTH]: R2 will have ${totalR2} nodes (minimum recommended: ${R2_MIN_NODES}). Consider adding more branches.`);
+  if (!input.suppressBreadthWarnings && r2NodesInBatch.length > 0 && totalR2 < R2_MIN_NODES) {
+    warnings.push(`[WARNING:R2_BREADTH] R2 will have ${totalR2} nodes (minimum recommended: ${R2_MIN_NODES}). Consider adding more branches.`);
   }
 
   // Store pending proposals
@@ -86,10 +88,11 @@ export async function handlePropose(input: ProposeInput, persistDir: string = ".
   state.save();
 
   return {
-    message: `NEXT: Spawn Task agents for ${proposed.map((n) => n.id).join(", ")}. Then call tot_commit with agentIds.`,
+    message: `NEXT: Run agents or investigate directly for ${proposed.map((n) => n.id).join(", ")}. Then call tot_commit with observed findings.`,
     status: "OK",
     approvedNodes: proposed.map((n) => n.id),
     warnings,
+    nextCommitDefaults: input.suppressBreadthWarnings ? { minRounds: 2, allowEarlyTerminal: true } : undefined,
     errors: [],
   };
 }

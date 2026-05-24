@@ -12,13 +12,16 @@ export class InvestigationState {
     this.persistDir = persistDir;
   }
 
-  static create(query: string, minRoots: number = 3, persistDir: string = "./investigations", projectDir: string = ""): InvestigationState {
+  static create(query: string, minRoots: number = 3, persistDir: string = "./investigations", projectDir: string = "", defaults: Partial<Pick<Investigation, "mode" | "minRounds" | "allowEarlyTerminal">> = {}): InvestigationState {
     const now = new Date().toISOString();
     const data: Investigation = {
       sessionId: uuidv4(),
       query,
       projectDir,
       minRoots,
+      mode: defaults.mode,
+      minRounds: defaults.minRounds,
+      allowEarlyTerminal: defaults.allowEarlyTerminal,
       currentRound: 1,
       currentBatch: 0,
       nodes: {},
